@@ -1,0 +1,27 @@
+# 日志文件
+download_log.txt
+cron_log.txt
+update_log.txt
+
+# 临时文件
+*.tmp
+*.bak
+
+# 敏感数据（CSV含人员信息，不建议推到公开仓库）
+勋章获得数据.csv
+勋章获得数据1.csv
+
+# 脚本和工具（本地运行，不需要推到GitHub）
+build_dashboard.py
+download_medal_data.py
+download_medal_data.bat
+update_dashboard.bat
+勋章指标设定工具.html
+勋章指标助手.html
+
+# Excel数据文件
+勋章映射.xlsx
+勋章获得条件及上线日期.xlsx
+
+# 图片
+采销岗勋章发放排行.png

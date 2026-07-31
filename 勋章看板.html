@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC勋章看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #0f1923;
+    color: #e0e6ed;
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center;
+    padding: 28px 20px 18px;
+    background: linear-gradient(135deg, #0f1923 0%, #1a2a3a 100%);
+    border-bottom: 2px solid #2a4a6a;
+  }
+  .header h1 {
+    font-size: 28px;
+    background: linear-gradient(90deg, #4fc3f7, #81d4fa, #ffcc80);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 4px;
+  }
+  .header .subtitle { color: #7a9bb5; font-size: 13px; margin-top: 6px; }
+
+  .container { max-width: 1440px; margin: 0 auto; padding: 20px; }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 12px;
+    padding: 18px 16px;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79,195,247,0.15); }
+  .kpi-card .label { font-size: 12px; color: #7a9bb5; margin-bottom: 8px; letter-spacing: 1px; }
+  .kpi-card .value { font-size: 26px; font-weight: 700; }
+  .kpi-card .unit { font-size: 11px; color: #5a7a95; margin-top: 4px; }
+  .kpi-card.highlight .value { color: #4fc3f7; }
+  .kpi-card.success .value { color: #66bb6a; }
+  .kpi-card.warning .value { color: #ffa726; }
+  .kpi-card.info .value { color: #ab47bc; }
+  .kpi-card.rose .value { color: #f06292; }
+  .kpi-card.cyan .value { color: #26c6da; }
+
+  /* Section */
+  .section {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-left: 10px;
+    border-left: 3px solid #4fc3f7;
+    color: #b0d4f1;
+  }
+  .section-title.gold { border-left-color: #ffd700; }
+  .section-title.green { border-left-color: #66bb6a; }
+  .section-title.rose { border-left-color: #f06292; }
+  .section-title.purple { border-left-color: #ab47bc; }
+  .section-title.orange { border-left-color: #ffa726; }
+  .section-title.cyan { border-left-color: #26c6da; }
+
+  .chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .chart-row.full { grid-template-columns: 1fr; }
+  .chart-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+  .chart-container { position: relative; width: 100%; }
+
+  /* Table */
+  .medal-table-wrap { max-height: 600px; overflow-y: auto; border-radius: 8px; }
+  .medal-table-wrap::-webkit-scrollbar { width: 6px; }
+  .medal-table-wrap::-webkit-scrollbar-track { background: #1a2a3a; }
+  .medal-table-wrap::-webkit-scrollbar-thumb { background: #3a5a7a; border-radius: 3px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { position: sticky; top: 0; z-index: 2; }
+  th {
+    background: #1a3550;
+    color: #7ab8e0;
+    padding: 10px 8px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #2a5a8a;
+    white-space: nowrap;
+  }
+  td { padding: 9px 8px; border-bottom: 1px solid #1e3550; white-space: nowrap; }
+  tr:hover td { background: rgba(79,195,247,0.06); }
+  .rank { color: #7a9bb5; font-weight: 600; text-align: center; }
+  .rank-top1 { color: #ffd700 !important; }
+  .rank-top2 { color: #c0c0c0 !important; }
+  .rank-top3 { color: #cd7f32 !important; }
+  .medal-name { color: #e0e6ed; font-weight: 500; }
+  .medal-code { color: #5a7a95; font-size: 11px; }
+  .count { text-align: right; font-weight: 600; color: #b0d4f1; }
+  .pct { text-align: right; color: #7a9bb5; }
+  .bar-cell { width: 110px; }
+  .bar-bg { background: #1a2a3a; border-radius: 3px; height: 16px; position: relative; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .tier-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tier-s { background: rgba(255,215,0,0.15); color: #ffd700; }
+  .tier-a { background: rgba(79,195,247,0.15); color: #4fc3f7; }
+  .tier-b { background: rgba(102,187,106,0.15); color: #66bb6a; }
+  .tier-c { background: rgba(255,167,38,0.15); color: #ffa726; }
+  .tier-d { background: rgba(171,71,188,0.15); color: #ab47bc; }
+
+  /* Badges */
+  .type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .purpose-huoyue { background: rgba(79,195,247,0.15); color: #4fc3f7; }
+  .purpose-gongneng { background: rgba(102,187,106,0.15); color: #66bb6a; }
+  .purpose-huodong { background: rgba(255,167,38,0.15); color: #ffa726; }
+  .purpose-jieri { background: rgba(240,98,146,0.15); color: #f06292; }
+  .mt-jiyu { background: rgba(255,215,0,0.12); color: #ffd700; }
+  .mt-rongyu { background: rgba(79,195,247,0.15); color: #4fc3f7; }
+  .mt-chengzhang { background: rgba(102,187,106,0.15); color: #66bb6a; }
+  .mt-xianding { background: rgba(171,71,188,0.15); color: #ab47bc; }
+  .mt-xinren { background: rgba(38,198,218,0.15); color: #26c6da; }
+  .attr-upgrade { background: rgba(171,71,188,0.15); color: #ab47bc; }
+  .attr-fixed { background: rgba(78,182,154,0.15); color: #4eb69a; }
+
+  /* Percentile */
+  .percentile-bar { margin: 12px 0; }
+  .percentile-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; }
+  .percentile-label { width: 90px; color: #7a9bb5; flex-shrink: 0; }
+  .percentile-track { flex: 1; height: 8px; background: #1a2a3a; border-radius: 4px; margin: 0 12px; position: relative; }
+  .percentile-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #4fc3f7, #81d4fa); }
+  .percentile-value { width: 36px; text-align: right; color: #b0d4f1; font-weight: 600; flex-shrink: 0; }
+
+  /* Insights */
+  .insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .insight-box {
+    background: rgba(79,195,247,0.06);
+    border: 1px solid rgba(79,195,247,0.15);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .insight-box .insight-title { font-size: 13px; color: #4fc3f7; margin-bottom: 8px; font-weight: 600; }
+  .insight-box .insight-text { font-size: 13px; color: #b0d4f1; line-height: 1.7; }
+  .insight-box .hl { color: #ffa726; font-weight: 700; }
+
+  /* Recommendations */
+  .rec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 14px;
+  }
+  .rec-card {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 12px;
+    padding: 18px;
+    transition: transform 0.2s;
+  }
+  .rec-card:hover { transform: translateY(-2px); }
+  .rec-card .rec-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .rec-card .rec-icon { font-size: 20px; }
+  .rec-card .rec-title { font-size: 14px; font-weight: 600; color: #b0d4f1; }
+  .rec-card .rec-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: auto;
+  }
+  .tag-urgent { background: rgba(239,83,80,0.15); color: #ef5350; }
+  .tag-important { background: rgba(255,167,38,0.15); color: #ffa726; }
+  .tag-suggest { background: rgba(79,195,247,0.15); color: #4fc3f7; }
+  .tag-strategic { background: rgba(171,71,188,0.15); color: #ab47bc; }
+  .rec-card .rec-body { font-size: 13px; color: #8aabb5; line-height: 1.8; }
+  .rec-card .rec-body strong { color: #b0d4f1; }
+  .rec-card .rec-body .m { color: #ffa726; font-weight: 700; }
+  .rec-card .rec-action {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #1e3550;
+    font-size: 12px;
+    color: #4fc3f7;
+    line-height: 1.7;
+  }
+  .rec-card .rec-action::before { content: '➜ '; }
+
+  /* Sort/filter buttons */
+  .sort-btns { margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .sort-btn {
+    padding: 5px 14px;
+    border-radius: 16px;
+    border: 1px solid #2a4a6a;
+    background: transparent;
+    color: #7a9bb5;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sort-btn:hover, .sort-btn.active { background: rgba(79,195,247,0.15); border-color: #4fc3f7; color: #4fc3f7; }
+  .filter-label { color: #7a9bb5; font-size: 12px; margin-right: 4px; }
+
+  /* Dim stat cards */
+  .dim-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .dim-stat {
+    background: rgba(79,195,247,0.06);
+    border: 1px solid rgba(79,195,247,0.12);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .dim-stat .dim-label { font-size: 12px; color: #7a9bb5; margin-bottom: 4px; }
+  .dim-stat .dim-value { font-size: 22px; font-weight: 700; color: #4fc3f7; }
+  .dim-stat .dim-sub { font-size: 11px; color: #5a7a95; margin-top: 2px; }
+
+  /* Distribution highlight card */
+  .dist-highlight {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .dist-card {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .dist-card .dist-label { font-size: 12px; color: #7a9bb5; margin-bottom: 6px; }
+  .dist-card .dist-value { font-size: 20px; font-weight: 700; }
+  .dist-card .dist-sub { font-size: 11px; color: #5a7a95; margin-top: 4px; }
+
+  @media (max-width: 900px) {
+    .chart-row, .chart-row.triple { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* Department section */
+  .dept-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .dept-card {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    transition: transform 0.2s;
+  }
+  .dept-card:hover { transform: translateY(-2px); }
+  .dept-card .dept-name { font-size: 14px; font-weight: 600; color: #b0d4f1; margin-bottom: 6px; }
+  .dept-card .dept-avg { font-size: 24px; font-weight: 700; color: #4fc3f7; }
+  .dept-card .dept-meta { font-size: 11px; color: #5a7a95; margin-top: 4px; }
+  .dept-card.resigned { border-color: rgba(239,83,80,0.3); }
+  .dept-card.resigned .dept-avg { color: #ef5350; }
+  .dept-card.resigned .dept-name { color: #ef9a9a; }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .compare-card {
+    background: rgba(79,195,247,0.06);
+    border: 1px solid rgba(79,195,247,0.12);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .compare-card.resigned-card { background: rgba(239,83,80,0.06); border-color: rgba(239,83,80,0.12); }
+  .compare-card .compare-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+  .compare-card .compare-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1e3550; font-size: 13px; }
+  .compare-card .compare-row:last-child { border-bottom: none; }
+  .compare-card .compare-label { color: #7a9bb5; }
+  .compare-card .compare-value { font-weight: 600; }
+  .dept2-section { margin-top: 16px; }
+  .dept2-toggle {
+    padding: 6px 14px; border-radius: 16px; border: 1px solid #2a4a6a;
+    background: transparent; color: #7a9bb5; font-size: 12px;
+    cursor: pointer; transition: all 0.2s; margin: 4px;
+  }
+  .dept2-toggle:hover, .dept2-toggle.active { background: rgba(79,195,247,0.15); border-color: #4fc3f7; color: #4fc3f7; }
+  .dept2-content { margin-top: 12px; }
+  .single-rate-bar { display: inline-block; height: 8px; border-radius: 4px; min-width: 4px; }
+
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎖️ CC勋章数据看板</h1>
+  <div class="subtitle">数据更新于 2026年7月 · 仅统计在职员工</div>
+</div>
+
+<div class="container">
+  <!-- KPI Cards -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- Insights -->
+  <div class="insights" id="insights"></div>
+
+  <!-- ===== NEW: Medal Count Distribution per User ===== -->
+  <div class="section">
+    <div class="section-title cyan">📊 用户勋章持有数量分布 — 你获得了几枚勋章？</div>
+    <div class="dist-highlight" id="distHighlight"></div>
+    <div class="chart-container"><canvas id="chartUserDist"></canvas></div>
+  </div>
+
+  <!-- Dimension Overview -->
+  <div class="section">
+    <div class="section-title gold">🏷️ 勋章维度总览 — 按目的 & 类型 & 属性分布</div>
+    <div class="dim-stats" id="dimStats"></div>
+    <div class="chart-row triple">
+      <div class="chart-container"><canvas id="chartPurpose"></canvas></div>
+      <div class="chart-container"><canvas id="chartType"></canvas></div>
+      <div class="chart-container"><canvas id="chartAttr"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Purpose breakdown bar -->
+  <div class="section">
+    <div class="section-title green">📊 各目的类型下勋章获得人次对比</div>
+    <div class="chart-container"><canvas id="chartPurposeBar"></canvas></div>
+  </div>
+
+  <!-- Recommendations -->
+  <div class="section">
+    <div class="section-title orange">💡 基于当前数据的勋章体系优化建议</div>
+    <div class="rec-grid" id="recommendations"></div>
+  </div>
+
+  <!-- Medal Popularity Table -->
+  <div class="section">
+    <div class="section-title">🏅 勋章发放排行 — 各勋章获得人数</div>
+    <div class="sort-btns" id="sortBtns"></div>
+    <div class="medal-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px;text-align:center">#</th>
+            <th>勋章名称</th>
+            <th>Code</th>
+            <th>目的类型</th>
+            <th>勋章类型</th>
+            <th>属性</th>
+            <th style="text-align:right">获得人数</th>
+            <th style="text-align:right">获得率</th>
+            <th class="bar-cell">占比可视化</th>
+            <th>等级 <span style="font-weight:400;font-size:10px;color:#5a7a95">(获得难度)</span></th>
+          </tr>
+        </thead>
+        <tbody id="medalTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Launch Timeline -->
+  <div class="section">
+    <div class="section-title purple">📅 勋章上线时间表</div>
+    <div class="medal-table-wrap" style="max-height:500px">
+      <table>
+        <thead>
+          <tr>
+            <th>勋章名称</th>
+            <th>目的</th>
+            <th>类型</th>
+            <th>属性</th>
+            <th>获得条件</th>
+            <th>上线/宣发时间</th>
+            <th style="text-align:right">获得人数</th>
+          </tr>
+        </thead>
+        <tbody id="timelineTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="chart-row">
+    <div class="section">
+      <div class="section-title">📊 勋章获得人数 Top 20</div>
+      <div class="chart-container"><canvas id="chartTopMedals"></canvas></div>
+    </div>
+    <div class="section">
+      <div class="section-title">📈 勋章持有区间分布</div>
+      <div class="chart-container"><canvas id="chartRanges"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-row">
+    <div class="section">
+      <div class="section-title">🎯 勋章等级分布</div>
+      <div style="margin-bottom:14px;padding:14px;background:rgba(79,195,247,0.06);border-radius:10px;font-size:13px;color:#b0d4f1;line-height:2">
+        <strong style="color:#4fc3f7">📌 等级含义说明：</strong>按"在有勋章用户中，多少人获得了这枚勋章"来划分难度等级——<br>
+        <span style="color:#ffd700;font-weight:700">S级</span> = 超过30%的人都有 → <span style="color:#7a9bb5">人人可得，含金量低（如"66大顺"96%的人都有）</span><br>
+        <span style="color:#4fc3f7;font-weight:700">A级</span> = 10%-30%的人有 → <span style="color:#7a9bb5">较容易获得（如"全域探索"28%）</span><br>
+        <span style="color:#66bb6a;font-weight:700">B级</span> = 3%-10%的人有 → <span style="color:#7a9bb5">需要一些努力才能获得，"进阶区间"（如"智问行家"8%）</span><br>
+        <span style="color:#ffa726;font-weight:700">C级</span> = 0.5%-3%的人有 → <span style="color:#7a9bb5">有一定难度（如"引凤先锋"1.7%）</span><br>
+        <span style="color:#ab47bc;font-weight:700">D级</span> = 不到0.5%的人有 → <span style="color:#7a9bb5">极难获得或入口不清，几乎没人拿到</span>
+      </div>
+      <div class="chart-container"><canvas id="chartTierPie"></canvas></div>
+    </div>
+    <div class="section">
+      <div class="section-title">📉 每枚勋章对应人数分布</div>
+      <div class="chart-container"><canvas id="chartDist"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Percentile -->
+  <div class="section">
+    <div class="section-title">📐 勋章数量百分位分析</div>
+    <div class="percentile-bar" id="percentileBar"></div>
+  </div>
+
+  <!-- Co-occurrence -->
+  <div class="section">
+    <div class="section-title">🔗 勋章共现 Top 15</div>
+    <div class="chart-container"><canvas id="chartCooccurrence"></canvas></div>
+  </div>
+
+
+  <div class="section">
+    <div class="section-title cyan">🏛️ 各一级部门勋章数据总览</div>
+    <div class="dept-grid" id="deptCards"></div>
+    <div class="chart-row">
+      <div class="chart-container"><canvas id="chartDeptAvg"></canvas></div>
+      <div class="chart-container"><canvas id="chartDeptSingleRate"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title green">📊 各部门二级部门勋章详情</div>
+    <div id="dept2Toggles"></div>
+    <div class="dept2-content" id="dept2Content"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title purple">🏷️ TOP20勋章的部门分布</div>
+    <div class="chart-container"><canvas id="chartMedalDeptStack"></canvas></div>
+  </div>
+
+  <!-- Cumulative -->
+  <div class="chart-row full">
+    <div class="section">
+      <div class="section-title">📉 累计人数曲线（拥有 ≥ N 枚勋章的用户占比）</div>
+      <div class="chart-container"><canvas id="chartCumulative"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = {"totalUsersWithMedals": 48050, "uniqueMedals": 46, "avgMedals": 5.2, "medianMedals": 3, "maxMedals": 38, "medals": [{"code": "GreatSuccess", "name": "66大顺", "count": 46364, "purpose": "节日纪念型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "2026年在职既有", "launch_date": "15号晚上线，16号宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2026年一月勋章", "full_name": "【2026勋章】--66大顺"}, {"code": "TimePartner", "name": "时间合伙人", "count": 23511, "purpose": "节日纪念型", "medal_type": "纪念勋章", "attribute": "升级勋章", "link": "", "rule": "", "launch_date": "", "note": "", "period": "", "full_name": "时间合伙人"}, {"code": "DragonBoatFestivalWellBeing", "name": "端午安康", "count": 19665, "purpose": "节日纪念型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "2016年6月19号-2016年6月30号期间登录获取", "launch_date": "612晚上线，613宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2026年6月勋章", "full_name": "【端午节相关】-端午安康"}, {"code": "PerfectAttendance", "name": "持之以恒", "count": 15864, "purpose": "活跃成长型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "无", "rule": "连续登陆21天获得金勋章\\n连续登陆14天获得银勋章\\n连续登陆7天获得铜勋章", "launch_date": "2025年9月1号，2号宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2025年勋章", "full_name": "【连续登录】-持之以恒"}, {"code": "FootprintsOfStruggle", "name": "奋斗足迹", "count": 15630, "purpose": "节日纪念型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "2026年5月30号-2026年6月30号登录领取", "launch_date": "", "note": "上线弹窗：有\\n 获得弹窗：有", "period": "2026年五月勋章", "full_name": "【618勋章】-奋斗足迹"}, {"code": "HappyNewYear", "name": "新春贺岁", "count": 15283, "purpose": "节日纪念型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "2026年2月14号-2026年3月14号登录领取", "launch_date": "13号晚上上线，14号宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2026年二月勋章", "full_name": "【春节纪念】--新春贺岁"}, {"code": "GlobalExploration", "name": "全域探索", "count": 13251, "purpose": "功能牵引型", "medal_type": "成长勋章", "attribute": "升级勋章", "link": "无", "rule": "累计查看50篇精选文章/课程获得金勋章\\n累计查看15篇精选文章/课程获得银勋章\\n累计查看1篇精选文章/课程获得铜勋章", "launch_date": "26号晚上线。27宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年一月勋章", "full_name": "【使用模块个数】--全域探索"}, {"code": "PioneerOfLanding", "name": "日积月累", "count": 11796, "purpose": "活跃成长型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "无", "rule": "累计登陆999天获得金勋章\\n累计登陆300天获得银勋章\\n累计登陆100天获得铜勋章", "launch_date": "2025年11月14号，15号宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2025年勋章", "full_name": "【累计登陆】-日积月累"}, {"code": "DoubleElevenPromotion", "name": "战斗印记", "count": 9331, "purpose": "节日纪念型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "2025年11月11号-2025年11月25号登录领取", "launch_date": "2025年10月28号，29号宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2025年勋章", "full_name": "【双十一纪念】-战斗印记"}, {"code": "LightIlluminatingTheFuture", "name": "灯映前程", "count": 9192, "purpose": "节日纪念型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "2026年3月3日登陆领取", "launch_date": "2号晚上上线，3号宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2026年三月勋章", "full_name": "【元宵节勋章】--灯映前程"}, {"code": "AnnualCompanion", "name": "年度同行者", "count": 8690, "purpose": "节日纪念型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "2025年在职既有", "launch_date": "2025年12月31号，2026年1月1号号宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2025年勋章", "full_name": "【2025年度】-年度同行者"}, {"code": "OswGrow", "name": "采销成长", "count": 7413, "purpose": "功能牵引型", "medal_type": "成长勋章", "attribute": "升级勋章", "link": "https://learn-osw.jd.com/knowledge/osw/home", "rule": "累计查看50篇精选文章/课程获得金勋章\\n累计查看15篇精选文章/课程获得银勋章\\n累计查看1篇精选文章/课程获得铜勋章", "launch_date": "2025年12月18号，19号宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2025年勋章", "full_name": "【采销成长】-勤学善思"}, {"code": "SmartSearchExpert", "name": "智搜达人", "count": 7307, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "无", "rule": "累计使用AI搜索60次获得金勋章\\n累计使用AI搜索30次获得银勋章\\n累计使用AI搜索10次获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年一月勋章", "full_name": "【ai搜索使用相关】--智搜达人"}, {"code": "IntelligentLearningPioneer", "name": "智学先锋", "count": 6396, "purpose": "活动激励型", "medal_type": "成长勋章", "attribute": "非升级勋章", "link": "https://hr.jd.com/myhr/training/homepage?extIframeUrl=https%253A%252F%252Fl.jd.com%252Fpc%252Fcourse%253Fproject_id%253D1203705960%2526courseId%253D1239979353%2526contentType%253D1002%2526projectContentId%253D1240076509%2526contentId%253D1239985401&jdme_router=jdme%3A%2F%2Fweb%2F201903250420%3Fmparam%3D%257B%2522url%2522%253A%2522https%253A%252F%252Fl.jd.com%252Fm%252Fcourse%253Fproject_id%253D1203705960%2522%257D", "rule": "白名单勋章", "launch_date": "4/1晚上线，4/2宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2016年四月勋章", "full_name": "【AI培训课程学习勋章】--智学先锋"}, {"code": "IntelligentDrivingExpert", "name": "智驭能手", "count": 6133, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/0/start", "rule": "累计使用ai专员200次获得金勋章\\n累计使用ai专员100次获得银勋章\\n累计使用ai专员30次获得铜勋章", "launch_date": "29号晚上线，30号宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年一月勋章", "full_name": "【ai专员使用相关】--智驭能手"}, {"code": "SupperConnector", "name": "超级运营", "count": 5975, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw-public-pro.local-pf.jd.com/deeplink-redirect.html?redirect_url=www.jd.com", "rule": "累计使用100天获得金勋章\\n累计使用21天获得银勋章\\n累计使用7天获得铜勋章", "launch_date": "22号晚上线，23宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年一月勋章", "full_name": "【超级插件】--超级运营"}, {"code": "SeekingExpertOpinions", "name": "智问行家", "count": 3966, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://aihelper.jd.com/assistant/chat", "rule": "累计使用AI助手15次获得金勋章\\n累计使用AI助手8次获得银勋章\\n累计使用AI助手3次获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年一月勋章", "full_name": "【ai助手使用相关】--智问行家"}, {"code": "StriveMakeSucceed", "name": "元气劳模", "count": 3752, "purpose": "功能牵引型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "2026年4月30号-2026年5月10号登陆领取", "launch_date": "4/29晚上线，4/30宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2016年四月勋章", "full_name": "【五一劳动节勋章】--元气劳模"}, {"code": "OperationsEfficiencySpecialist", "name": "运营提效师", "count": 3391, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/0/start", "rule": "累计使用RPA200次获得金勋章\\n累计使用RPA100次获得银勋章\\n累计使用RPA50次获得铜勋章", "launch_date": "4/20晚上线，4/21宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2016年四月勋章", "full_name": "【流程自动化勋章】--运营提效师"}, {"code": "AnalyzingBaiShiTong", "name": "分析百事通", "count": 3092, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/0/start", "rule": "累计使用AI分析专员下技能个数5个获得金勋章\\n累计使用AI分析专员下技能个数3个获得银勋章\\n累计使用AI分析专员下技能个数1个获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年五月勋章", "full_name": "【AI分析专员使用技能个数相关】-分析百事通"}, {"code": "ToolMaster", "name": "工具大师", "count": 2937, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/tool-box/", "rule": "累计使用工具箱工具12次获得金勋章\\n累计使用工具箱工具4次获得银勋章\\n累计使用工具箱工具1次获得铜勋章", "launch_date": "27号上线，28号宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年二月勋章", "full_name": "【使用工具箱次数】-工具大师"}, {"code": "SpottingTalentAtGlance", "name": "慧眼识珠", "count": 2617, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/scrm/clueManagementList?name=claimClue", "rule": "累计使用CRM20次获得金勋章\\n累计使用CRM10次获得银勋章\\n累计使用CRM6次获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年二月勋章", "full_name": "【使用CRM次数】-慧眼识珠"}, {"code": "PursueKnowledge", "name": "笃行求知", "count": 2227, "purpose": "活动激励型", "medal_type": "成长勋章", "attribute": "非升级勋章", "link": "https://joyspace.jd.com/pages/aOjKs00UcUkEqqmSgH3N", "rule": "C2维度发放", "launch_date": "19号晚上上线，20号宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2026年三月勋章", "full_name": "【参与线下培训勋章】--笃行求知"}, {"code": "DataExpress", "name": "超级数据官", "count": 1255, "purpose": "活动激励型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "白名单勋章", "launch_date": "528晚上线", "note": "上线弹窗：无\\n 获得弹窗：有", "period": "2026年五月勋章", "full_name": "【大表共建相关勋章】-超级数据官"}, {"code": "PioneerForAttractingTalent", "name": "引凤先锋", "count": 824, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/cz/bundling/pop2Self/center", "rule": "累计邀约并升级成功的店铺数达20个获得金勋章\\n累计邀约并升级成功的店铺数达10个获得银勋章\\n累计邀约并升级成功的店铺数达1个获得铜勋章", "launch_date": "623晚上线，624宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年6月勋章", "full_name": "【引凤计划相关】-引凤先锋"}, {"code": "AreaInspector", "name": "全域巡检官", "count": 747, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/0/start", "rule": "累计使用AI巡检专员下技能个数5个获得金勋章\\n累计使用AI巡检专员下技能个数3个获得银勋章\\n累计使用AI巡检专员下技能个数1个获得铜勋章", "launch_date": "6/8晚上线，6/9宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年五月勋章", "full_name": "【AI巡检专员使用技能个数相关】-全域巡检官"}, {"code": "IntelligentDrive", "name": "自动化达人", "count": 520, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/0/start", "rule": "累计使用流程自动化下技能个数5个获得金勋章\\n累计使用流程自动化下技能个数3个获得银勋章\\n累计使用流程自动化下技能个数1个获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年五月勋章", "full_name": "【流程自动化使用技能个数相关】-自动化达人"}, {"code": "EfficiencyChampion", "name": "模板优选家", "count": 305, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/0/start", "rule": "累计使用AI运营专员下技能个数9个获得金勋章\\n累计使用AI运营专员下技能个数5个获得银勋章\\n累计使用AI运营专员下技能个数3个获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年五月勋章", "full_name": "【AI运营专员使用技能个数相关】-模板优选家"}, {"code": "ProductCoCreators", "name": "感恩共建", "count": 213, "purpose": "活动激励型", "medal_type": "限定勋章", "attribute": "非升级勋章", "link": "无", "rule": "白名单勋章", "launch_date": "2025年11月27号，28号宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2025年勋章", "full_name": "【采销工作台纪念】-感恩共建"}, {"code": "CreativeExperienceOfficer", "name": "创意体验官", "count": 207, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://aitool.jd.com/guide/community", "rule": "累计使用功能5次获得金勋章\\n累计使用功能3次获得银勋章\\n累计使用功能1次获得铜勋章", "launch_date": "525晚上线，526宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年五月勋章", "full_name": "【AI创意社区功能累计使用次数】-创意体验官"}, {"code": "OriginalStar", "name": "原创制表人", "count": 179, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/9/9?path=%2Fspreadsheets%2F24362862", "rule": "超级大表累计上传10个模板获得金勋章\\n超级大表累计上传3个模板获得银勋章\\n超级大表累计上传1个模板获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2016年四月勋章", "full_name": "【超级大表上传模版个数勋章】--原创制表人"}, {"code": "AIThinkTank", "name": "AI智囊团", "count": 100, "purpose": "活动激励型", "medal_type": "限定勋章", "attribute": "非升级勋章", "link": "无", "rule": "白名单勋章", "launch_date": "611晚上线，612宣发", "note": "", "period": "2026年6月勋章", "full_name": "【AI-SKILL共建勋章】-AI智囊团"}, {"code": "ShareTheVanguards", "name": "数据分享家", "count": 80, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/9/9?path=%2Fspreadsheets%2F24362862", "rule": "超级大表文件累计分享50次获得金勋章\\n超级大表文件累计分享15次获得银勋章\\n超级大表文件累计分享5次获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2016年四月勋章", "full_name": "【超级大表文件分享次数勋章】--数据分享家"}, {"code": "LuckyFishAtNewYear", "name": "开年锦鲤", "count": 57, "purpose": "活动激励型", "medal_type": "限定勋章", "attribute": "非升级勋章", "link": "无", "rule": "白名单勋章", "launch_date": "4号晚上上线，5号宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2026年二月勋章", "full_name": "【H5年终活动中奖人员】-开年锦鲤"}, {"code": "InteractiveStar", "name": "互动之星", "count": 55, "purpose": "活动激励型", "medal_type": "成长勋章", "attribute": "非升级勋章", "link": "https://joyspace.jd.com/pages/aOjKs00UcUkEqqmSgH3N", "rule": "白名单勋章", "launch_date": "", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2026年三月勋章", "full_name": "【线下培训活跃份子】--互动之星"}, {"code": "AIResourcefulPerson", "name": "AI智多星", "count": 53, "purpose": "活动激励型", "medal_type": "纪念勋章", "attribute": "非升级勋章", "link": "无", "rule": "白名单勋章", "launch_date": "1月7号晚上线，8号宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年一月勋章", "full_name": "【AI活动勋章】-AI智多星"}, {"code": "SuperDataOfficer", "name": "超级分析师", "count": 35, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/9/9?path=%2Fspreadsheets%2F24362862", "rule": "超级大表累计使用100天获得金勋章\\n超级大表累计使用21天获得银勋章\\n超级大表累计使用7天获得铜勋章", "launch_date": "4/23晚上线，4/24宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2016年四月勋章", "full_name": "【超级大表累计使用天数勋章】--超级分析师"}, {"code": "RoleModelPower", "name": "榜样力量", "count": 33, "purpose": "活动激励型", "medal_type": "成长勋章", "attribute": "非升级勋章", "link": "https://joyspace.jd.com/pages/aOjKs00UcUkEqqmSgH3N", "rule": "白名单勋章", "launch_date": "", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2026年三月勋章", "full_name": "【线下培训案例分享】--榜样力量"}, {"code": "CreativeTemplateDesigner", "name": "创意模版师", "count": 17, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://aitool.jd.com/guide/community", "rule": "累计创建模版10个获得金勋章\\n累计创建模版5个获得银勋章\\n累计创建模版3个获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年五月勋章", "full_name": "【AI创意社区创建模版个数】-创意模板师"}, {"code": "GrowthInsightOfficer", "name": "成长洞察官", "count": 13, "purpose": "活动激励型", "medal_type": "成长勋章", "attribute": "非升级勋章", "link": "https://learn-osw.jd.com/knowledge/osw/guide?keys=KyOvFchrsBu8AxiAuEQt%2CNrT5oxrCkZc47OSCt5Zh%2CFjgyiKYdzVT1ELqT0GMR&teamId=aX5JkNdEaVSnlgAPG5EqK", "rule": "白名单勋章", "launch_date": "12号晚上上线，13号宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2026年三月勋章", "full_name": "【成长调研活动勋章】--成长洞察官"}, {"code": "GrowtCoBuilder", "name": "成长共筑者", "count": 6, "purpose": "活动激励型", "medal_type": "成长勋章", "attribute": "非升级勋章", "link": "https://learn-osw.jd.com/knowledge/osw/guide?keys=KyOvFchrsBu8AxiAuEQt%2CNrT5oxrCkZc47OSCt5Zh%2C2rLyQb33OcxlKHpoIZtU&teamId=aX5JkNdEaVSnlgAPG5EqK", "rule": "白名单勋章", "launch_date": "4/9晚上线，4/10宣发", "note": "上线弹窗：无\\n获得弹窗：正常", "period": "2016年四月勋章", "full_name": "【成长共建活动勋章】--成长共筑者"}, {"code": "TrustAuthorizationHome", "name": "信任授权家", "count": 1, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/seller-account/purchasing-sales-user-management", "rule": "累计分配我的名下权限给3人获得铜勋章\\n累计分配我的名下权限给4人获得银勋章\\n累计分配我的名下权限给6人获得金勋章", "launch_date": "629晚上线，630宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年6月勋章", "full_name": "【分配我的名下权限给X人】-信任授权家"}, {"code": "CollaborativeProxy", "name": "协作代行人", "count": 1, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/seller-account/purchasing-sales-user-management", "rule": "累计代理2人名下权限获得铜勋章\\n累计代理4人名下权限获得银勋章\\n累计代理7人名下权限获得金勋章", "launch_date": "629晚上线，631宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年6月勋章", "full_name": "【代理权限个数勋章】-协作代行人"}, {"code": "ProcessIntelligenceController", "name": "流程智控师", "count": 1, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/myflow/0/start", "rule": "累计使用流程智控下技能个数5个获得金勋章\\n累计使用流程智控下技能个数3个获得银勋章\\n累计使用流程智控下技能个数1个获得铜勋章", "launch_date": "", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年五月勋章", "full_name": "【流程智控使用技能个数相关】-流程智控师"}, {"code": "EmergencyGuardian", "name": "应急守护人", "count": 1, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/seller-account/purchasing-sales-user-management", "rule": "累计触发2次小于7天的权限代理获得铜勋章\\n累计触发4次小于7天的权限代理获得银勋章\\n累计触发6次小于7天的权限代理获得金勋章", "launch_date": "629晚上线，633宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年6月勋章", "full_name": "【触发7天权限代理勋章】-应急守护人"}, {"code": "NewcomerOnboardingHome", "name": "新人带教家", "count": 1, "purpose": "功能牵引型", "medal_type": "荣誉勋章", "attribute": "升级勋章", "link": "https://osw.jd.com/seller-account/purchasing-sales-user-management", "rule": "累计给1名入职90天内新员工分配权限获得铜勋章\\n累计给2名入职90天内新员工分配权限获得银勋章\\n累计给3名入职90天内新员工分配权限获得金勋章", "launch_date": "629晚上线，632宣发", "note": "上线弹窗：正常\\n获得弹窗：正常", "period": "2026年6月勋章", "full_name": "【给新员工分配权限勋章】-新人带教家"}], "distribution": [{"count": 1, "users": 13700}, {"count": 2, "users": 9615}, {"count": 3, "users": 6281}, {"count": 4, "users": 3135}, {"count": 5, "users": 1503}, {"count": 6, "users": 1180}, {"count": 7, "users": 1011}, {"count": 8, "users": 862}, {"count": 9, "users": 869}, {"count": 10, "users": 916}, {"count": 11, "users": 981}, {"count": 12, "users": 990}, {"count": 13, "users": 1005}, {"count": 14, "users": 1033}, {"count": 15, "users": 924}, {"count": 16, "users": 872}, {"count": 17, "users": 769}, {"count": 18, "users": 693}, {"count": 19, "users": 571}, {"count": 20, "users": 449}, {"count": 21, "users": 304}, {"count": 22, "users": 197}, {"count": 23, "users": 102}, {"count": 24, "users": 60}, {"count": 25, "users": 14}, {"count": 26, "users": 7}, {"count": 27, "users": 4}, {"count": 28, "users": 1}, {"count": 29, "users": 1}, {"count": 30, "users": 0}, {"count": 31, "users": 0}, {"count": 32, "users": 0}, {"count": 33, "users": 0}, {"count": 34, "users": 0}, {"count": 35, "users": 0}, {"count": 36, "users": 0}, {"count": 37, "users": 0}, {"count": 38, "users": 1}], "ranges": [{"label": "1枚", "count": 13700}, {"label": "2-3枚", "count": 15896}, {"label": "4-5枚", "count": 4638}, {"label": "6-10枚", "count": 4838}, {"label": "11-15枚", "count": 4933}, {"label": "16-20枚", "count": 3354}, {"label": "21-30枚", "count": 690}, {"label": "30+枚", "count": 1}], "topPairs": [{"medal1": "66大顺", "medal2": "时间合伙人", "count": 23511}, {"medal1": "端午安康", "medal2": "66大顺", "count": 19665}, {"medal1": "奋斗足迹", "medal2": "66大顺", "count": 15630}, {"medal1": "66大顺", "medal2": "新春贺岁", "count": 15283}, {"medal1": "端午安康", "medal2": "时间合伙人", "count": 14874}, {"medal1": "66大顺", "medal2": "持之以恒", "count": 14708}, {"medal1": "端午安康", "medal2": "奋斗足迹", "count": 13636}, {"medal1": "全域探索", "medal2": "66大顺", "count": 13228}, {"medal1": "全域探索", "medal2": "持之以恒", "count": 12715}, {"medal1": "奋斗足迹", "medal2": "时间合伙人", "count": 11770}, {"medal1": "持之以恒", "medal2": "日积月累", "count": 11627}, {"medal1": "66大顺", "medal2": "日积月累", "count": 11549}, {"medal1": "新春贺岁", "medal2": "持之以恒", "count": 11500}, {"medal1": "端午安康", "medal2": "持之以恒", "count": 11185}, {"medal1": "全域探索", "medal2": "新春贺岁", "count": 10982}], "percentiles": {"p10": 1, "p25": 1, "p50": 3, "p75": 7, "p90": 15}, "typeBreakdown": {"纪念勋章": 11, "荣誉勋章": 24, "成长勋章": 8, "限定勋章": 3}, "purposeBreakdown": {"节日纪念型": 8, "活跃成长型": 2, "功能牵引型": 25, "活动激励型": 11}, "attrBreakdown": {"非升级勋章": 19, "升级勋章": 27}, "typeUserCounts": {"荣誉勋章": 16355, "纪念勋章": 47365, "成长勋章": 14003, "限定勋章": 346}, "purposeUserCounts": {"活跃成长型": 16033, "节日纪念型": 47365, "功能牵引型": 14951, "活动激励型": 7579}, "attrUserCounts": {"升级勋章": 31161, "非升级勋章": 47370}, "launchTimeline": [{"name": "66大顺", "date": "15号晚上线，16号宣发", "type": "纪念勋章", "purpose": "节日纪念型", "count": 46364}, {"name": "端午安康", "date": "612晚上线，613宣发", "type": "纪念勋章", "purpose": "节日纪念型", "count": 19665}, {"name": "持之以恒", "date": "2025年9月1号，2号宣发", "type": "荣誉勋章", "purpose": "活跃成长型", "count": 15864}, {"name": "新春贺岁", "date": "13号晚上上线，14号宣发", "type": "纪念勋章", "purpose": "节日纪念型", "count": 15283}, {"name": "全域探索", "date": "26号晚上线。27宣发", "type": "成长勋章", "purpose": "功能牵引型", "count": 13251}, {"name": "日积月累", "date": "2025年11月14号，15号宣发", "type": "荣誉勋章", "purpose": "活跃成长型", "count": 11796}, {"name": "战斗印记", "date": "2025年10月28号，29号宣发", "type": "纪念勋章", "purpose": "节日纪念型", "count": 9331}, {"name": "灯映前程", "date": "2号晚上上线，3号宣发", "type": "纪念勋章", "purpose": "节日纪念型", "count": 9192}, {"name": "年度同行者", "date": "2025年12月31号，2026年1月1号号宣发", "type": "纪念勋章", "purpose": "节日纪念型", "count": 8690}, {"name": "采销成长", "date": "2025年12月18号，19号宣发", "type": "成长勋章", "purpose": "功能牵引型", "count": 7413}, {"name": "智学先锋", "date": "4/1晚上线，4/2宣发", "type": "成长勋章", "purpose": "活动激励型", "count": 6396}, {"name": "智驭能手", "date": "29号晚上线，30号宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 6133}, {"name": "超级运营", "date": "22号晚上线，23宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 5975}, {"name": "元气劳模", "date": "4/29晚上线，4/30宣发", "type": "纪念勋章", "purpose": "功能牵引型", "count": 3752}, {"name": "运营提效师", "date": "4/20晚上线，4/21宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 3391}, {"name": "工具大师", "date": "27号上线，28号宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 2937}, {"name": "笃行求知", "date": "19号晚上上线，20号宣发", "type": "成长勋章", "purpose": "活动激励型", "count": 2227}, {"name": "超级数据官", "date": "528晚上线", "type": "纪念勋章", "purpose": "活动激励型", "count": 1255}, {"name": "引凤先锋", "date": "623晚上线，624宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 824}, {"name": "全域巡检官", "date": "6/8晚上线，6/9宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 747}, {"name": "感恩共建", "date": "2025年11月27号，28号宣发", "type": "限定勋章", "purpose": "活动激励型", "count": 213}, {"name": "创意体验官", "date": "525晚上线，526宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 207}, {"name": "AI智囊团", "date": "611晚上线，612宣发", "type": "限定勋章", "purpose": "活动激励型", "count": 100}, {"name": "开年锦鲤", "date": "4号晚上上线，5号宣发", "type": "限定勋章", "purpose": "活动激励型", "count": 57}, {"name": "AI智多星", "date": "1月7号晚上线，8号宣发", "type": "纪念勋章", "purpose": "活动激励型", "count": 53}, {"name": "超级分析师", "date": "4/23晚上线，4/24宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 35}, {"name": "成长洞察官", "date": "12号晚上上线，13号宣发", "type": "成长勋章", "purpose": "活动激励型", "count": 13}, {"name": "成长共筑者", "date": "4/9晚上线，4/10宣发", "type": "成长勋章", "purpose": "活动激励型", "count": 6}, {"name": "信任授权家", "date": "629晚上线，630宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 1}, {"name": "协作代行人", "date": "629晚上线，631宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 1}, {"name": "应急守护人", "date": "629晚上线，633宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 1}, {"name": "新人带教家", "date": "629晚上线，632宣发", "type": "荣誉勋章", "purpose": "功能牵引型", "count": 1}], "purposeTypeMatrix": {"活跃成长型|荣誉勋章": 16033, "节日纪念型|纪念勋章": 47365, "功能牵引型|荣誉勋章": 11073, "功能牵引型|纪念勋章": 3752, "活动激励型|成长勋章": 7221, "功能牵引型|成长勋章": 13513, "活动激励型|纪念勋章": 1287, "活动激励型|限定勋章": 346}, "deptSummary": [{"name": "京东健康", "total": 1479, "avg": 7.26, "median": 4, "max": 24, "singleCount": 310, "singleRate": 21.0, "medalTotal": 10742, "top5": [{"name": "66大顺", "count": 1463}, {"name": "端午安康", "count": 874}, {"name": "奋斗足迹", "count": 755}, {"name": "时间合伙人", "count": 747}, {"name": "持之以恒", "count": 726}]}, {"name": "京东零售", "total": 25128, "avg": 7.03, "median": 4, "max": 38, "singleCount": 5258, "singleRate": 20.9, "medalTotal": 176553, "top5": [{"name": "66大顺", "count": 24555}, {"name": "端午安康", "count": 13666}, {"name": "时间合伙人", "count": 13661}, {"name": "奋斗足迹", "count": 11503}, {"name": "持之以恒", "count": 11494}]}, {"name": "京东工业", "total": 995, "avg": 6.42, "median": 4, "max": 24, "singleCount": 166, "singleRate": 16.7, "medalTotal": 6390, "top5": [{"name": "66大顺", "count": 987}, {"name": "端午安康", "count": 637}, {"name": "时间合伙人", "count": 609}, {"name": "奋斗足迹", "count": 524}, {"name": "新春贺岁", "count": 346}]}, {"name": "未知", "total": 4871, "avg": 4.07, "median": 2, "max": 21, "singleCount": 1799, "singleRate": 36.9, "medalTotal": 19821, "top5": [{"name": "66大顺", "count": 3813}, {"name": "持之以恒", "count": 2914}, {"name": "新春贺岁", "count": 1726}, {"name": "全域探索", "count": 1697}, {"name": "日积月累", "count": 1324}]}, {"name": "CCO体系", "total": 1629, "avg": 3.62, "median": 2, "max": 20, "singleCount": 679, "singleRate": 41.7, "medalTotal": 5898, "top5": [{"name": "66大顺", "count": 1621}, {"name": "时间合伙人", "count": 733}, {"name": "端午安康", "count": 488}, {"name": "新春贺岁", "count": 360}, {"name": "奋斗足迹", "count": 336}]}, {"name": "战略部", "total": 2, "avg": 3.5, "median": 3, "max": 5, "singleCount": 0, "singleRate": 0.0, "medalTotal": 7, "top5": [{"name": "66大顺", "count": 2}, {"name": "时间合伙人", "count": 2}, {"name": "日积月累", "count": 1}, {"name": "持之以恒", "count": 1}, {"name": "智学先锋", "count": 1}]}, {"name": "综合部", "total": 4, "avg": 3.5, "median": 3, "max": 7, "singleCount": 1, "singleRate": 25.0, "medalTotal": 14, "top5": [{"name": "66大顺", "count": 4}, {"name": "持之以恒", "count": 3}, {"name": "全域探索", "count": 2}, {"name": "新春贺岁", "count": 2}, {"name": "智驭能手", "count": 1}]}, {"name": "国际事业群", "total": 76, "avg": 3.37, "median": 2, "max": 16, "singleCount": 23, "singleRate": 30.3, "medalTotal": 256, "top5": [{"name": "66大顺", "count": 73}, {"name": "时间合伙人", "count": 27}, {"name": "端午安康", "count": 23}, {"name": "新春贺岁", "count": 22}, {"name": "持之以恒", "count": 17}]}, {"name": "京东物流", "total": 12495, "avg": 2.1, "median": 2, "max": 18, "singleCount": 4730, "singleRate": 37.9, "medalTotal": 26212, "top5": [{"name": "66大顺", "count": 12491}, {"name": "时间合伙人", "count": 6852}, {"name": "端午安康", "count": 3551}, {"name": "奋斗足迹", "count": 2132}, {"name": "新春贺岁", "count": 628}]}, {"name": "总裁办公室", "total": 22, "avg": 2.05, "median": 1, "max": 10, "singleCount": 12, "singleRate": 54.5, "medalTotal": 45, "top5": [{"name": "66大顺", "count": 22}, {"name": "时间合伙人", "count": 8}, {"name": "持之以恒", "count": 3}, {"name": "日积月累", "count": 2}, {"name": "奋斗足迹", "count": 2}]}, {"name": "CFO体系", "total": 362, "avg": 2.0, "median": 2, "max": 9, "singleCount": 161, "singleRate": 44.5, "medalTotal": 723, "top5": [{"name": "66大顺", "count": 360}, {"name": "时间合伙人", "count": 160}, {"name": "端午安康", "count": 71}, {"name": "新春贺岁", "count": 55}, {"name": "奋斗足迹", "count": 37}]}, {"name": "京东科技", "total": 734, "avg": 1.87, "median": 1, "max": 18, "singleCount": 419, "singleRate": 57.1, "medalTotal": 1371, "top5": [{"name": "66大顺", "count": 721}, {"name": "时间合伙人", "count": 236}, {"name": "端午安康", "count": 137}, {"name": "新春贺岁", "count": 60}, {"name": "奋斗足迹", "count": 36}]}, {"name": "CHO体系", "total": 203, "avg": 1.87, "median": 1, "max": 12, "singleCount": 111, "singleRate": 54.7, "medalTotal": 379, "top5": [{"name": "66大顺", "count": 203}, {"name": "时间合伙人", "count": 75}, {"name": "端午安康", "count": 32}, {"name": "新春贺岁", "count": 19}, {"name": "奋斗足迹", "count": 8}]}, {"name": "京东产发", "total": 43, "avg": 1.58, "median": 1, "max": 3, "singleCount": 25, "singleRate": 58.1, "medalTotal": 68, "top5": [{"name": "66大顺", "count": 42}, {"name": "时间合伙人", "count": 16}, {"name": "端午安康", "count": 5}, {"name": "奋斗足迹", "count": 4}, {"name": "战斗印记", "count": 1}]}, {"name": "探索研究院", "total": 7, "avg": 1.14, "median": 1, "max": 2, "singleCount": 6, "singleRate": 85.7, "medalTotal": 8, "top5": [{"name": "66大顺", "count": 7}, {"name": "端午安康", "count": 1}]}], "dept2Summary": {"未知": [{"name": "未知", "total": 4871, "avg": 4.07, "median": 2, "max": 21, "singleCount": 1799, "singleRate": 36.9, "medalTotal": 19821}], "京东零售": [{"name": "大商超事业群", "total": 2384, "avg": 12.85, "median": 14, "max": 26, "singleCount": 56, "singleRate": 2.3, "medalTotal": 30635}, {"name": "大时尚事业群", "total": 1406, "avg": 12.59, "median": 14, "max": 25, "singleCount": 48, "singleRate": 3.4, "medalTotal": 17707}, {"name": "3C数码事业群", "total": 1705, "avg": 12.44, "median": 13, "max": 27, "singleCount": 59, "singleRate": 3.5, "medalTotal": 21212}, {"name": "跨境事业部", "total": 478, "avg": 11.45, "median": 12, "max": 22, "singleCount": 24, "singleRate": 5.0, "medalTotal": 5472}, {"name": "京喜事业部", "total": 1084, "avg": 10.77, "median": 12, "max": 21, "singleCount": 35, "singleRate": 3.2, "medalTotal": 11676}, {"name": "自有品牌业务部", "total": 403, "avg": 9.35, "median": 9, "max": 22, "singleCount": 30, "singleRate": 7.4, "medalTotal": 3768}, {"name": "汽车事业部", "total": 610, "avg": 9.21, "median": 8, "max": 25, "singleCount": 86, "singleRate": 14.1, "medalTotal": 5619}, {"name": "家电家居事业群", "total": 5800, "avg": 7.95, "median": 6, "max": 29, "singleCount": 898, "singleRate": 15.5, "medalTotal": 46124}, {"name": "创新零售事业群", "total": 1643, "avg": 5.79, "median": 4, "max": 23, "singleCount": 316, "singleRate": 19.2, "medalTotal": 9514}, {"name": "Y事业部", "total": 469, "avg": 3.89, "median": 3, "max": 19, "singleCount": 97, "singleRate": 20.7, "medalTotal": 1823}, {"name": "平台产品与研发中心", "total": 1781, "avg": 3.67, "median": 2, "max": 38, "singleCount": 550, "singleRate": 30.9, "medalTotal": 6539}, {"name": "本地生活服务事业群", "total": 379, "avg": 3.67, "median": 2, "max": 20, "singleCount": 158, "singleRate": 41.7, "medalTotal": 1391}, {"name": "平台生态部", "total": 396, "avg": 3.62, "median": 2, "max": 16, "singleCount": 125, "singleRate": 31.6, "medalTotal": 1434}, {"name": "拍卖业务部", "total": 29, "avg": 2.69, "median": 2, "max": 11, "singleCount": 12, "singleRate": 41.4, "medalTotal": 78}, {"name": "拍拍二手业务部", "total": 5, "avg": 2.6, "median": 3, "max": 4, "singleCount": 2, "singleRate": 40.0, "medalTotal": 13}, {"name": "平台营销中心", "total": 282, "avg": 2.3, "median": 2, "max": 14, "singleCount": 111, "singleRate": 39.4, "medalTotal": 650}, {"name": "客户体验与服务部", "total": 6226, "avg": 2.06, "median": 2, "max": 19, "singleCount": 2625, "singleRate": 42.2, "medalTotal": 12802}, {"name": "赛夫事业部", "total": 45, "avg": 2, "median": 1, "max": 10, "singleCount": 25, "singleRate": 55.6, "medalTotal": 90}, {"name": "战略与综合支持部", "total": 3, "avg": 2, "median": 2, "max": 3, "singleCount": 1, "singleRate": 33.3, "medalTotal": 6}], "京东物流": [{"name": "欧洲区", "total": 12, "avg": 3, "median": 1, "max": 18, "singleCount": 6, "singleRate": 50.0, "medalTotal": 36}, {"name": "综合人才部", "total": 2, "avg": 3, "median": 3, "max": 3, "singleCount": 0, "singleRate": 0.0, "medalTotal": 6}, {"name": "市场与公共事务部", "total": 27, "avg": 2.33, "median": 2, "max": 17, "singleCount": 10, "singleRate": 37.0, "medalTotal": 63}, {"name": "服务业务部", "total": 280, "avg": 2.19, "median": 2, "max": 16, "singleCount": 125, "singleRate": 44.6, "medalTotal": 614}, {"name": "中东区", "total": 6, "avg": 2.17, "median": 2, "max": 3, "singleCount": 2, "singleRate": 33.3, "medalTotal": 13}, {"name": "客户体验与服务部", "total": 1149, "avg": 2.15, "median": 2, "max": 5, "singleCount": 384, "singleRate": 33.4, "medalTotal": 2473}, {"name": "运营部", "total": 9967, "avg": 2.12, "median": 2, "max": 11, "singleCount": 3700, "singleRate": 37.1, "medalTotal": 21139}, {"name": "销售部", "total": 260, "avg": 1.91, "median": 2, "max": 6, "singleCount": 111, "singleRate": 42.7, "medalTotal": 497}, {"name": "产品研发部", "total": 179, "avg": 1.87, "median": 2, "max": 6, "singleCount": 72, "singleRate": 40.2, "medalTotal": 335}, {"name": "供应链规划及产品部", "total": 155, "avg": 1.83, "median": 2, "max": 9, "singleCount": 64, "singleRate": 41.3, "medalTotal": 284}, {"name": "X科技部", "total": 28, "avg": 1.82, "median": 1, "max": 11, "singleCount": 17, "singleRate": 60.7, "medalTotal": 51}, {"name": "亚太区", "total": 83, "avg": 1.81, "median": 1, "max": 11, "singleCount": 46, "singleRate": 55.4, "medalTotal": 150}, {"name": "快递快运规划及产品部", "total": 15, "avg": 1.73, "median": 2, "max": 3, "singleCount": 6, "singleRate": 40.0, "medalTotal": 26}, {"name": "无人机业务部", "total": 3, "avg": 1.67, "median": 2, "max": 2, "singleCount": 1, "singleRate": 33.3, "medalTotal": 5}, {"name": "秒送物流事业部", "total": 147, "avg": 1.63, "median": 1, "max": 5, "singleCount": 83, "singleRate": 56.5, "medalTotal": 240}, {"name": "运力平台部", "total": 168, "avg": 1.57, "median": 1, "max": 4, "singleCount": 91, "singleRate": 54.2, "medalTotal": 264}, {"name": "战略与综合支持部", "total": 2, "avg": 1.5, "median": 1, "max": 2, "singleCount": 1, "singleRate": 50.0, "medalTotal": 3}, {"name": "海外服务部", "total": 7, "avg": 1.14, "median": 1, "max": 2, "singleCount": 6, "singleRate": 85.7, "medalTotal": 8}, {"name": "美洲区", "total": 5, "avg": 1, "median": 1, "max": 1, "singleCount": 5, "singleRate": 100.0, "medalTotal": 5}], "京东工业": [{"name": "工业品平台业务部", "total": 284, "avg": 13.31, "median": 15, "max": 24, "singleCount": 11, "singleRate": 3.9, "medalTotal": 3780}, {"name": "自有品牌业务部", "total": 46, "avg": 5.54, "median": 4, "max": 17, "singleCount": 4, "singleRate": 8.7, "medalTotal": 255}, {"name": "SMB业务部", "total": 50, "avg": 5.04, "median": 4, "max": 17, "singleCount": 5, "singleRate": 10.0, "medalTotal": 252}, {"name": "MRO业务部", "total": 164, "avg": 4.91, "median": 4, "max": 16, "singleCount": 10, "singleRate": 6.1, "medalTotal": 805}, {"name": "BOM业务部", "total": 82, "avg": 4.61, "median": 4, "max": 13, "singleCount": 5, "singleRate": 6.1, "medalTotal": 378}, {"name": "国际商品供应链部", "total": 14, "avg": 3.71, "median": 3, "max": 14, "singleCount": 2, "singleRate": 14.3, "medalTotal": 52}, {"name": "西北区", "total": 15, "avg": 3.6, "median": 3, "max": 11, "singleCount": 4, "singleRate": 26.7, "medalTotal": 54}, {"name": "KA行业客户部", "total": 20, "avg": 3.35, "median": 2, "max": 12, "singleCount": 4, "singleRate": 20.0, "medalTotal": 67}, {"name": "大客户部", "total": 29, "avg": 3.17, "median": 2, "max": 17, "singleCount": 7, "singleRate": 24.1, "medalTotal": 92}, {"name": "华南区", "total": 31, "avg": 2.97, "median": 2, "max": 16, "singleCount": 11, "singleRate": 35.5, "medalTotal": 92}, {"name": "技术产品部", "total": 85, "avg": 2.48, "median": 2, "max": 15, "singleCount": 35, "singleRate": 41.2, "medalTotal": 211}, {"name": "华中区", "total": 19, "avg": 2.32, "median": 2, "max": 11, "singleCount": 9, "singleRate": 47.4, "medalTotal": 44}, {"name": "综合服务与业务发展部", "total": 34, "avg": 2.21, "median": 2, "max": 5, "singleCount": 8, "singleRate": 23.5, "medalTotal": 75}, {"name": "北方区", "total": 37, "avg": 2.03, "median": 2, "max": 11, "singleCount": 15, "singleRate": 40.5, "medalTotal": 75}, {"name": "华东区", "total": 25, "avg": 2, "median": 2, "max": 6, "singleCount": 10, "singleRate": 40.0, "medalTotal": 50}, {"name": "供应链规划与运营部", "total": 27, "avg": 1.93, "median": 2, "max": 3, "singleCount": 8, "singleRate": 29.6, "medalTotal": 52}, {"name": "西南区", "total": 19, "avg": 1.89, "median": 2, "max": 4, "singleCount": 8, "singleRate": 42.1, "medalTotal": 36}, {"name": "欧洲区", "total": 4, "avg": 1.75, "median": 1, "max": 3, "singleCount": 2, "singleRate": 50.0, "medalTotal": 7}, {"name": "亚太区", "total": 7, "avg": 1.43, "median": 1, "max": 3, "singleCount": 5, "singleRate": 71.4, "medalTotal": 10}, {"name": "美洲区", "total": 2, "avg": 1, "median": 1, "max": 1, "singleCount": 2, "singleRate": 100.0, "medalTotal": 2}, {"name": "中东区", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}], "CCO体系": [{"name": "党委办公室", "total": 1, "avg": 16, "median": 16, "max": 16, "singleCount": 0, "singleRate": 0.0, "medalTotal": 16}, {"name": "集团政企业务部", "total": 1287, "avg": 4.08, "median": 2, "max": 20, "singleCount": 524, "singleRate": 40.7, "medalTotal": 5248}, {"name": "审计部", "total": 40, "avg": 2.48, "median": 2, "max": 16, "singleCount": 8, "singleRate": 20.0, "medalTotal": 99}, {"name": "法律合规部", "total": 28, "avg": 2.29, "median": 2, "max": 6, "singleCount": 10, "singleRate": 35.7, "medalTotal": 64}, {"name": "京东经济发展研究院", "total": 1, "avg": 2, "median": 2, "max": 2, "singleCount": 0, "singleRate": 0.0, "medalTotal": 2}, {"name": "物流内控合规部", "total": 180, "avg": 1.79, "median": 2, "max": 5, "singleCount": 79, "singleRate": 43.9, "medalTotal": 323}, {"name": "知识产权保护部", "total": 14, "avg": 1.71, "median": 1, "max": 5, "singleCount": 10, "singleRate": 71.4, "medalTotal": 24}, {"name": "监察部", "total": 9, "avg": 1.67, "median": 1, "max": 3, "singleCount": 5, "singleRate": 55.6, "medalTotal": 15}, {"name": "信息安全部", "total": 44, "avg": 1.66, "median": 1, "max": 5, "singleCount": 25, "singleRate": 56.8, "medalTotal": 73}, {"name": "商业合规部", "total": 8, "avg": 1.62, "median": 1, "max": 3, "singleCount": 5, "singleRate": 62.5, "medalTotal": 13}, {"name": "公共关系部", "total": 2, "avg": 1.5, "median": 1, "max": 2, "singleCount": 1, "singleRate": 50.0, "medalTotal": 3}, {"name": "厂直防损部", "total": 7, "avg": 1.43, "median": 1, "max": 2, "singleCount": 4, "singleRate": 57.1, "medalTotal": 10}, {"name": "地方业务发展部", "total": 3, "avg": 1, "median": 1, "max": 1, "singleCount": 3, "singleRate": 100.0, "medalTotal": 3}, {"name": "中央部委事务部", "total": 2, "avg": 1, "median": 1, "max": 1, "singleCount": 2, "singleRate": 100.0, "medalTotal": 2}, {"name": "司法行业服务部", "total": 3, "avg": 1, "median": 1, "max": 1, "singleCount": 3, "singleRate": 100.0, "medalTotal": 3}], "京东健康": [{"name": "医疗器械业务部", "total": 92, "avg": 12.42, "median": 14, "max": 24, "singleCount": 0, "singleRate": 0.0, "medalTotal": 1143}, {"name": "消费器械业务部", "total": 98, "avg": 12.11, "median": 13, "max": 24, "singleCount": 2, "singleRate": 2.0, "medalTotal": 1187}, {"name": "营养保健业务部", "total": 251, "avg": 11.82, "median": 13, "max": 22, "singleCount": 6, "singleRate": 2.4, "medalTotal": 2967}, {"name": "医药业务部", "total": 265, "avg": 10.71, "median": 12, "max": 23, "singleCount": 25, "singleRate": 9.4, "medalTotal": 2837}, {"name": "用户与商家体验部", "total": 63, "avg": 7.21, "median": 5, "max": 16, "singleCount": 3, "singleRate": 4.8, "medalTotal": 454}, {"name": "企业业务部", "total": 23, "avg": 4.26, "median": 2, "max": 14, "singleCount": 9, "singleRate": 39.1, "medalTotal": 98}, {"name": "即时零售业务部", "total": 373, "avg": 3.45, "median": 2, "max": 17, "singleCount": 147, "singleRate": 39.4, "medalTotal": 1287}, {"name": "到家服务业务部", "total": 23, "avg": 3.09, "median": 2, "max": 7, "singleCount": 8, "singleRate": 34.8, "medalTotal": 71}, {"name": "互联网医疗业务部", "total": 28, "avg": 2.75, "median": 2, "max": 13, "singleCount": 13, "singleRate": 46.4, "medalTotal": 77}, {"name": "市场营销部", "total": 23, "avg": 2.57, "median": 2, "max": 10, "singleCount": 9, "singleRate": 39.1, "medalTotal": 59}, {"name": "公共事务与合规部", "total": 117, "avg": 2.44, "median": 2, "max": 11, "singleCount": 40, "singleRate": 34.2, "medalTotal": 285}, {"name": "技术产品部", "total": 59, "avg": 2.41, "median": 2, "max": 12, "singleCount": 22, "singleRate": 37.3, "medalTotal": 142}, {"name": "消费医疗业务部", "total": 58, "avg": 2.19, "median": 2, "max": 6, "singleCount": 22, "singleRate": 37.9, "medalTotal": 127}, {"name": "智慧医疗业务部", "total": 4, "avg": 1.5, "median": 1, "max": 2, "singleCount": 2, "singleRate": 50.0, "medalTotal": 6}, {"name": "战略与综合支持部", "total": 2, "avg": 1, "median": 1, "max": 1, "singleCount": 2, "singleRate": 100.0, "medalTotal": 2}], "CFO体系": [{"name": "应付共享中心", "total": 57, "avg": 2.82, "median": 2, "max": 6, "singleCount": 11, "singleRate": 19.3, "medalTotal": 161}, {"name": "健康财务部", "total": 11, "avg": 2.36, "median": 2, "max": 7, "singleCount": 5, "singleRate": 45.5, "medalTotal": 26}, {"name": "预算与分析部", "total": 4, "avg": 2, "median": 2, "max": 3, "singleCount": 1, "singleRate": 25.0, "medalTotal": 8}, {"name": "战略投资部", "total": 2, "avg": 2, "median": 2, "max": 2, "singleCount": 0, "singleRate": 0.0, "medalTotal": 4}, {"name": "工业财务部", "total": 3, "avg": 2, "median": 2, "max": 3, "singleCount": 1, "singleRate": 33.3, "medalTotal": 6}, {"name": "零售财务部", "total": 154, "avg": 1.99, "median": 2, "max": 9, "singleCount": 68, "singleRate": 44.2, "medalTotal": 307}, {"name": "财务部", "total": 23, "avg": 1.91, "median": 2, "max": 4, "singleCount": 10, "singleRate": 43.5, "medalTotal": 44}, {"name": "资金部", "total": 8, "avg": 1.75, "median": 1, "max": 3, "singleCount": 5, "singleRate": 62.5, "medalTotal": 14}, {"name": "物流财务部", "total": 31, "avg": 1.65, "median": 1, "max": 3, "singleCount": 16, "singleRate": 51.6, "medalTotal": 51}, {"name": "集采中心", "total": 36, "avg": 1.58, "median": 1, "max": 7, "singleCount": 22, "singleRate": 61.1, "medalTotal": 57}, {"name": "国际业务财务部", "total": 12, "avg": 1.42, "median": 1, "max": 3, "singleCount": 8, "singleRate": 66.7, "medalTotal": 17}, {"name": "税务服务部", "total": 15, "avg": 1.4, "median": 1, "max": 2, "singleCount": 9, "singleRate": 60.0, "medalTotal": 21}, {"name": "科技财务部", "total": 4, "avg": 1.25, "median": 1, "max": 2, "singleCount": 3, "singleRate": 75.0, "medalTotal": 5}, {"name": "产发财务部", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}, {"name": "公司金融部", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}], "战略部": [{"name": "NULL", "total": 2, "avg": 3.5, "median": 3, "max": 5, "singleCount": 0, "singleRate": 0.0, "medalTotal": 7}], "京东科技": [{"name": "变色龙业务部", "total": 13, "avg": 4.08, "median": 2, "max": 13, "singleCount": 3, "singleRate": 23.1, "medalTotal": 53}, {"name": "金刚项目组", "total": 4, "avg": 2.5, "median": 1, "max": 6, "singleCount": 2, "singleRate": 50.0, "medalTotal": 10}, {"name": "市场与平台运营中心", "total": 38, "avg": 2.32, "median": 1, "max": 10, "singleCount": 21, "singleRate": 55.3, "medalTotal": 88}, {"name": "金融科技事业群", "total": 129, "avg": 2.22, "median": 2, "max": 13, "singleCount": 61, "singleRate": 47.3, "medalTotal": 286}, {"name": "客户体验与服务部", "total": 30, "avg": 2, "median": 2, "max": 4, "singleCount": 12, "singleRate": 40.0, "medalTotal": 60}, {"name": "协同办公业务部", "total": 5, "avg": 2, "median": 2, "max": 3, "singleCount": 2, "singleRate": 40.0, "medalTotal": 10}, {"name": "海外金融创新业务部", "total": 4, "avg": 2, "median": 2, "max": 3, "singleCount": 2, "singleRate": 50.0, "medalTotal": 8}, {"name": "战略与综合支持部", "total": 5, "avg": 1.8, "median": 2, "max": 3, "singleCount": 2, "singleRate": 40.0, "medalTotal": 9}, {"name": "保险业务部", "total": 266, "avg": 1.75, "median": 1, "max": 18, "singleCount": 169, "singleRate": 63.5, "medalTotal": 465}, {"name": "风险管理中心", "total": 27, "avg": 1.7, "median": 1, "max": 4, "singleCount": 16, "singleRate": 59.3, "medalTotal": 46}, {"name": "京东云事业部", "total": 101, "avg": 1.63, "median": 1, "max": 11, "singleCount": 61, "singleRate": 60.4, "medalTotal": 165}, {"name": "智能风险资管业务部", "total": 105, "avg": 1.54, "median": 1, "max": 3, "singleCount": 62, "singleRate": 59.0, "medalTotal": 162}, {"name": "人工智能业务部", "total": 7, "avg": 1.29, "median": 1, "max": 3, "singleCount": 6, "singleRate": 85.7, "medalTotal": 9}], "CHO体系": [{"name": "健康人力资源部", "total": 1, "avg": 6, "median": 6, "max": 6, "singleCount": 0, "singleRate": 0.0, "medalTotal": 6}, {"name": "工业人力资源部", "total": 2, "avg": 4, "median": 4, "max": 5, "singleCount": 0, "singleRate": 0.0, "medalTotal": 8}, {"name": "零售人力资源部", "total": 30, "avg": 2.9, "median": 2, "max": 12, "singleCount": 12, "singleRate": 40.0, "medalTotal": 87}, {"name": "成长中心", "total": 7, "avg": 2.57, "median": 1, "max": 10, "singleCount": 5, "singleRate": 71.4, "medalTotal": 18}, {"name": "组织部", "total": 1, "avg": 2, "median": 2, "max": 2, "singleCount": 0, "singleRate": 0.0, "medalTotal": 2}, {"name": "行政服务中心", "total": 19, "avg": 1.95, "median": 2, "max": 5, "singleCount": 7, "singleRate": 36.8, "medalTotal": 37}, {"name": "企业信息化部", "total": 44, "avg": 1.84, "median": 2, "max": 7, "singleCount": 21, "singleRate": 47.7, "medalTotal": 81}, {"name": "物流人力资源部", "total": 61, "avg": 1.57, "median": 1, "max": 3, "singleCount": 34, "singleRate": 55.7, "medalTotal": 96}, {"name": "科技人力资源部", "total": 2, "avg": 1.5, "median": 1, "max": 2, "singleCount": 1, "singleRate": 50.0, "medalTotal": 3}, {"name": "国际人力资源部", "total": 5, "avg": 1.4, "median": 1, "max": 2, "singleCount": 3, "singleRate": 60.0, "medalTotal": 7}, {"name": "人才引进部", "total": 3, "avg": 1.33, "median": 1, "max": 2, "singleCount": 2, "singleRate": 66.7, "medalTotal": 4}, {"name": "共享服务中心", "total": 18, "avg": 1.11, "median": 1, "max": 2, "singleCount": 16, "singleRate": 88.9, "medalTotal": 20}, {"name": "职能BP组", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}, {"name": "校企合作部", "total": 2, "avg": 1, "median": 1, "max": 1, "singleCount": 2, "singleRate": 100.0, "medalTotal": 2}, {"name": "组织发展中心", "total": 6, "avg": 1, "median": 1, "max": 1, "singleCount": 6, "singleRate": 100.0, "medalTotal": 6}, {"name": "产发人力资源部", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}], "京东产发": [{"name": "西区", "total": 1, "avg": 2, "median": 2, "max": 2, "singleCount": 0, "singleRate": 0.0, "medalTotal": 2}, {"name": "华南区", "total": 3, "avg": 2, "median": 2, "max": 3, "singleCount": 1, "singleRate": 33.3, "medalTotal": 6}, {"name": "华东二区", "total": 1, "avg": 2, "median": 2, "max": 2, "singleCount": 0, "singleRate": 0.0, "medalTotal": 2}, {"name": "华北区", "total": 6, "avg": 1.83, "median": 1, "max": 3, "singleCount": 3, "singleRate": 50.0, "medalTotal": 11}, {"name": "资产运营部", "total": 4, "avg": 1.75, "median": 1, "max": 3, "singleCount": 2, "singleRate": 50.0, "medalTotal": 7}, {"name": "物流招商部", "total": 3, "avg": 1.67, "median": 2, "max": 2, "singleCount": 1, "singleRate": 33.3, "medalTotal": 5}, {"name": "投资部", "total": 3, "avg": 1.67, "median": 2, "max": 2, "singleCount": 1, "singleRate": 33.3, "medalTotal": 5}, {"name": "华中区", "total": 4, "avg": 1.5, "median": 1, "max": 3, "singleCount": 3, "singleRate": 75.0, "medalTotal": 6}, {"name": "华东一区", "total": 6, "avg": 1.5, "median": 1, "max": 3, "singleCount": 4, "singleRate": 66.7, "medalTotal": 9}, {"name": "运营与保障部", "total": 2, "avg": 1.5, "median": 1, "max": 2, "singleCount": 1, "singleRate": 50.0, "medalTotal": 3}, {"name": "北区", "total": 7, "avg": 1.29, "median": 1, "max": 3, "singleCount": 6, "singleRate": 85.7, "medalTotal": 9}, {"name": "中东区", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}, {"name": "工程部", "total": 2, "avg": 1, "median": 1, "max": 1, "singleCount": 2, "singleRate": 100.0, "medalTotal": 2}], "国际事业群": [{"name": "全球售业务部", "total": 10, "avg": 6, "median": 5, "max": 14, "singleCount": 1, "singleRate": 10.0, "medalTotal": 60}, {"name": "跨境业务三部", "total": 11, "avg": 5, "median": 3, "max": 16, "singleCount": 2, "singleRate": 18.2, "medalTotal": 55}, {"name": "荷比卢业务部", "total": 3, "avg": 3.67, "median": 3, "max": 6, "singleCount": 0, "singleRate": 0.0, "medalTotal": 11}, {"name": "自有品牌部", "total": 5, "avg": 3.2, "median": 2, "max": 7, "singleCount": 1, "singleRate": 20.0, "medalTotal": 16}, {"name": "品牌出海部", "total": 1, "avg": 3, "median": 3, "max": 3, "singleCount": 0, "singleRate": 0.0, "medalTotal": 3}, {"name": "跨境业务二部", "total": 11, "avg": 2.82, "median": 2, "max": 9, "singleCount": 4, "singleRate": 36.4, "medalTotal": 31}, {"name": "跨境业务一部", "total": 13, "avg": 2.77, "median": 1, "max": 14, "singleCount": 7, "singleRate": 53.8, "medalTotal": 36}, {"name": "德国业务部", "total": 4, "avg": 2.5, "median": 2, "max": 4, "singleCount": 1, "singleRate": 25.0, "medalTotal": 10}, {"name": "综合支持部", "total": 9, "avg": 2.22, "median": 2, "max": 4, "singleCount": 2, "singleRate": 22.2, "medalTotal": 20}, {"name": "客户服务部", "total": 2, "avg": 2, "median": 2, "max": 3, "singleCount": 1, "singleRate": 50.0, "medalTotal": 4}, {"name": "平台营销中心", "total": 2, "avg": 1.5, "median": 1, "max": 2, "singleCount": 1, "singleRate": 50.0, "medalTotal": 3}, {"name": "英国业务部", "total": 4, "avg": 1.5, "median": 1, "max": 2, "singleCount": 2, "singleRate": 50.0, "medalTotal": 6}, {"name": "国际合规部", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}], "综合部": [{"name": "管培生部", "total": 4, "avg": 3.5, "median": 3, "max": 7, "singleCount": 1, "singleRate": 25.0, "medalTotal": 14}], "总裁办公室": [{"name": "NULL", "total": 5, "avg": 4, "median": 3, "max": 10, "singleCount": 0, "singleRate": 0.0, "medalTotal": 20}, {"name": "京东美术馆", "total": 3, "avg": 2.67, "median": 2, "max": 5, "singleCount": 1, "singleRate": 33.3, "medalTotal": 8}, {"name": "行政司机组", "total": 1, "avg": 2, "median": 2, "max": 2, "singleCount": 0, "singleRate": 0.0, "medalTotal": 2}, {"name": "重大项目办公室", "total": 10, "avg": 1.2, "median": 1, "max": 2, "singleCount": 8, "singleRate": 80.0, "medalTotal": 12}, {"name": "综合组", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}, {"name": "秘书组", "total": 2, "avg": 1, "median": 1, "max": 1, "singleCount": 2, "singleRate": 100.0, "medalTotal": 2}], "探索研究院": [{"name": "大数据工程部", "total": 2, "avg": 1.5, "median": 1, "max": 2, "singleCount": 1, "singleRate": 50.0, "medalTotal": 3}, {"name": "自然语言实验室", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}, {"name": "空间与具身智能实验室", "total": 2, "avg": 1, "median": 1, "max": 1, "singleCount": 2, "singleRate": 100.0, "medalTotal": 2}, {"name": "女娲实验室", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}, {"name": "语音与声学实验室", "total": 1, "avg": 1, "median": 1, "max": 1, "singleCount": 1, "singleRate": 100.0, "medalTotal": 1}]}, "medalDeptDist": [{"name": "66大顺", "code": "GreatSuccess", "total": 46364, "dist": [{"dept": "京东零售", "count": 24555}, {"dept": "京东物流", "count": 12491}, {"dept": "未知", "count": 3813}, {"dept": "CCO体系", "count": 1621}, {"dept": "京东健康", "count": 1463}, {"dept": "京东工业", "count": 987}, {"dept": "京东科技", "count": 721}, {"dept": "CFO体系", "count": 360}, {"dept": "CHO体系", "count": 203}, {"dept": "国际事业群", "count": 73}, {"dept": "京东产发", "count": 42}, {"dept": "总裁办公室", "count": 22}, {"dept": "探索研究院", "count": 7}, {"dept": "综合部", "count": 4}, {"dept": "战略部", "count": 2}]}, {"name": "时间合伙人", "code": "TimePartner", "total": 23511, "dist": [{"dept": "京东零售", "count": 13661}, {"dept": "京东物流", "count": 6852}, {"dept": "京东健康", "count": 747}, {"dept": "CCO体系", "count": 733}, {"dept": "京东工业", "count": 609}, {"dept": "未知", "count": 385}, {"dept": "京东科技", "count": 236}, {"dept": "CFO体系", "count": 160}, {"dept": "CHO体系", "count": 75}, {"dept": "国际事业群", "count": 27}, {"dept": "京东产发", "count": 16}, {"dept": "总裁办公室", "count": 8}, {"dept": "战略部", "count": 2}]}, {"name": "端午安康", "code": "DragonBoatFestivalWellBeing", "total": 19665, "dist": [{"dept": "京东零售", "count": 13666}, {"dept": "京东物流", "count": 3551}, {"dept": "京东健康", "count": 874}, {"dept": "京东工业", "count": 637}, {"dept": "CCO体系", "count": 488}, {"dept": "未知", "count": 179}, {"dept": "京东科技", "count": 137}, {"dept": "CFO体系", "count": 71}, {"dept": "CHO体系", "count": 32}, {"dept": "国际事业群", "count": 23}, {"dept": "京东产发", "count": 5}, {"dept": "探索研究院", "count": 1}, {"dept": "总裁办公室", "count": 1}]}, {"name": "持之以恒", "code": "PerfectAttendance", "total": 15864, "dist": [{"dept": "京东零售", "count": 11494}, {"dept": "未知", "count": 2914}, {"dept": "京东健康", "count": 726}, {"dept": "京东工业", "count": 339}, {"dept": "CCO体系", "count": 303}, {"dept": "京东科技", "count": 30}, {"dept": "京东物流", "count": 25}, {"dept": "国际事业群", "count": 17}, {"dept": "CHO体系", "count": 5}, {"dept": "CFO体系", "count": 4}, {"dept": "综合部", "count": 3}, {"dept": "总裁办公室", "count": 3}, {"dept": "战略部", "count": 1}]}, {"name": "奋斗足迹", "code": "FootprintsOfStruggle", "total": 15630, "dist": [{"dept": "京东零售", "count": 11503}, {"dept": "京东物流", "count": 2132}, {"dept": "京东健康", "count": 755}, {"dept": "京东工业", "count": 524}, {"dept": "CCO体系", "count": 336}, {"dept": "未知", "count": 281}, {"dept": "CFO体系", "count": 37}, {"dept": "京东科技", "count": 36}, {"dept": "国际事业群", "count": 12}, {"dept": "CHO体系", "count": 8}, {"dept": "京东产发", "count": 4}, {"dept": "总裁办公室", "count": 2}]}, {"name": "新春贺岁", "code": "HappyNewYear", "total": 15283, "dist": [{"dept": "京东零售", "count": 11372}, {"dept": "未知", "count": 1726}, {"dept": "京东健康", "count": 691}, {"dept": "京东物流", "count": 628}, {"dept": "CCO体系", "count": 360}, {"dept": "京东工业", "count": 346}, {"dept": "京东科技", "count": 60}, {"dept": "CFO体系", "count": 55}, {"dept": "国际事业群", "count": 22}, {"dept": "CHO体系", "count": 19}, {"dept": "综合部", "count": 2}, {"dept": "总裁办公室", "count": 2}]}, {"name": "全域探索", "code": "GlobalExploration", "total": 13251, "dist": [{"dept": "京东零售", "count": 10197}, {"dept": "未知", "count": 1697}, {"dept": "京东健康", "count": 662}, {"dept": "京东工业", "count": 330}, {"dept": "CCO体系", "count": 292}, {"dept": "京东物流", "count": 23}, {"dept": "京东科技", "count": 23}, {"dept": "国际事业群", "count": 12}, {"dept": "CHO体系", "count": 7}, {"dept": "CFO体系", "count": 5}, {"dept": "综合部", "count": 2}, {"dept": "总裁办公室", "count": 1}]}, {"name": "日积月累", "code": "PioneerOfLanding", "total": 11796, "dist": [{"dept": "京东零售", "count": 9356}, {"dept": "未知", "count": 1324}, {"dept": "京东健康", "count": 559}, {"dept": "京东工业", "count": 266}, {"dept": "CCO体系", "count": 239}, {"dept": "京东科技", "count": 17}, {"dept": "京东物流", "count": 14}, {"dept": "国际事业群", "count": 10}, {"dept": "CHO体系", "count": 5}, {"dept": "CFO体系", "count": 3}, {"dept": "总裁办公室", "count": 2}, {"dept": "战略部", "count": 1}]}, {"name": "战斗印记", "code": "DoubleElevenPromotion", "total": 9331, "dist": [{"dept": "京东零售", "count": 7205}, {"dept": "未知", "count": 1267}, {"dept": "京东健康", "count": 383}, {"dept": "京东工业", "count": 220}, {"dept": "CCO体系", "count": 185}, {"dept": "京东科技", "count": 28}, {"dept": "京东物流", "count": 20}, {"dept": "国际事业群", "count": 10}, {"dept": "CHO体系", "count": 6}, {"dept": "CFO体系", "count": 4}, {"dept": "总裁办公室", "count": 2}, {"dept": "京东产发", "count": 1}]}, {"name": "灯映前程", "code": "LightIlluminatingTheFuture", "total": 9192, "dist": [{"dept": "京东零售", "count": 7219}, {"dept": "未知", "count": 954}, {"dept": "京东健康", "count": 447}, {"dept": "京东工业", "count": 252}, {"dept": "CCO体系", "count": 201}, {"dept": "京东物流", "count": 66}, {"dept": "京东科技", "count": 22}, {"dept": "CFO体系", "count": 14}, {"dept": "国际事业群", "count": 13}, {"dept": "CHO体系", "count": 4}]}, {"name": "年度同行者", "code": "AnnualCompanion", "total": 8690, "dist": [{"dept": "京东零售", "count": 6778}, {"dept": "未知", "count": 1101}, {"dept": "京东健康", "count": 362}, {"dept": "京东工业", "count": 213}, {"dept": "CCO体系", "count": 187}, {"dept": "京东物流", "count": 15}, {"dept": "京东科技", "count": 12}, {"dept": "国际事业群", "count": 11}, {"dept": "CFO体系", "count": 7}, {"dept": "CHO体系", "count": 3}, {"dept": "综合部", "count": 1}]}, {"name": "采销成长", "code": "OswGrow", "total": 7413, "dist": [{"dept": "京东零售", "count": 5821}, {"dept": "未知", "count": 842}, {"dept": "京东健康", "count": 352}, {"dept": "京东工业", "count": 207}, {"dept": "CCO体系", "count": 153}, {"dept": "京东物流", "count": 14}, {"dept": "京东科技", "count": 12}, {"dept": "CHO体系", "count": 5}, {"dept": "CFO体系", "count": 3}, {"dept": "国际事业群", "count": 3}, {"dept": "综合部", "count": 1}]}, {"name": "智搜达人", "code": "SmartSearchExpert", "total": 7307, "dist": [{"dept": "京东零售", "count": 5828}, {"dept": "未知", "count": 702}, {"dept": "京东健康", "count": 393}, {"dept": "京东工业", "count": 230}, {"dept": "CCO体系", "count": 135}, {"dept": "京东物流", "count": 9}, {"dept": "京东科技", "count": 6}, {"dept": "国际事业群", "count": 4}]}, {"name": "智学先锋", "code": "IntelligentLearningPioneer", "total": 6396, "dist": [{"dept": "京东零售", "count": 5918}, {"dept": "未知", "count": 441}, {"dept": "京东健康", "count": 18}, {"dept": "京东科技", "count": 5}, {"dept": "国际事业群", "count": 4}, {"dept": "CCO体系", "count": 4}, {"dept": "京东工业", "count": 3}, {"dept": "战略部", "count": 1}, {"dept": "总裁办公室", "count": 1}, {"dept": "京东物流", "count": 1}]}, {"name": "智驭能手", "code": "IntelligentDrivingExpert", "total": 6133, "dist": [{"dept": "京东零售", "count": 4769}, {"dept": "未知", "count": 522}, {"dept": "京东健康", "count": 423}, {"dept": "京东工业", "count": 237}, {"dept": "CCO体系", "count": 168}, {"dept": "京东物流", "count": 5}, {"dept": "京东科技", "count": 4}, {"dept": "国际事业群", "count": 4}, {"dept": "综合部", "count": 1}]}, {"name": "超级运营", "code": "SupperConnector", "total": 5975, "dist": [{"dept": "京东零售", "count": 4756}, {"dept": "未知", "count": 666}, {"dept": "京东健康", "count": 279}, {"dept": "京东工业", "count": 206}, {"dept": "CCO体系", "count": 50}, {"dept": "京东科技", "count": 9}, {"dept": "国际事业群", "count": 5}, {"dept": "京东物流", "count": 4}]}, {"name": "智问行家", "code": "SeekingExpertOpinions", "total": 3966, "dist": [{"dept": "京东零售", "count": 3145}, {"dept": "未知", "count": 398}, {"dept": "京东健康", "count": 204}, {"dept": "京东工业", "count": 127}, {"dept": "CCO体系", "count": 77}, {"dept": "京东物流", "count": 8}, {"dept": "CHO体系", "count": 3}, {"dept": "京东科技", "count": 3}, {"dept": "国际事业群", "count": 1}]}, {"name": "元气劳模", "code": "StriveMakeSucceed", "total": 3752, "dist": [{"dept": "京东零售", "count": 3156}, {"dept": "京东物流", "count": 336}, {"dept": "未知", "count": 111}, {"dept": "京东健康", "count": 78}, {"dept": "京东工业", "count": 34}, {"dept": "CCO体系", "count": 31}, {"dept": "国际事业群", "count": 3}, {"dept": "京东科技", "count": 2}, {"dept": "CHO体系", "count": 1}]}, {"name": "运营提效师", "code": "OperationsEfficiencySpecialist", "total": 3391, "dist": [{"dept": "京东零售", "count": 2760}, {"dept": "京东健康", "count": 276}, {"dept": "京东工业", "count": 183}, {"dept": "CCO体系", "count": 121}, {"dept": "未知", "count": 48}, {"dept": "京东物流", "count": 3}]}, {"name": "分析百事通", "code": "AnalyzingBaiShiTong", "total": 3092, "dist": [{"dept": "京东零售", "count": 2673}, {"dept": "京东健康", "count": 253}, {"dept": "京东工业", "count": 109}, {"dept": "CCO体系", "count": 28}, {"dept": "未知", "count": 26}, {"dept": "京东物流", "count": 2}, {"dept": "CHO体系", "count": 1}]}, {"name": "工具大师", "code": "ToolMaster", "total": 2937, "dist": [{"dept": "京东零售", "count": 2474}, {"dept": "京东健康", "count": 220}, {"dept": "京东工业", "count": 89}, {"dept": "未知", "count": 81}, {"dept": "CCO体系", "count": 60}, {"dept": "京东物流", "count": 10}, {"dept": "京东科技", "count": 2}, {"dept": "总裁办公室", "count": 1}]}, {"name": "慧眼识珠", "code": "SpottingTalentAtGlance", "total": 2617, "dist": [{"dept": "京东零售", "count": 2137}, {"dept": "京东健康", "count": 137}, {"dept": "京东工业", "count": 129}, {"dept": "CCO体系", "count": 108}, {"dept": "未知", "count": 104}, {"dept": "京东科技", "count": 1}, {"dept": "京东物流", "count": 1}]}, {"name": "笃行求知", "code": "PursueKnowledge", "total": 2227, "dist": [{"dept": "京东零售", "count": 1987}, {"dept": "未知", "count": 138}, {"dept": "京东健康", "count": 92}, {"dept": "京东科技", "count": 4}, {"dept": "CHO体系", "count": 2}, {"dept": "京东工业", "count": 2}, {"dept": "国际事业群", "count": 1}, {"dept": "京东物流", "count": 1}]}, {"name": "超级数据官", "code": "DataExpress", "total": 1255, "dist": [{"dept": "京东零售", "count": 1074}, {"dept": "京东健康", "count": 128}, {"dept": "京东工业", "count": 35}, {"dept": "未知", "count": 16}, {"dept": "CCO体系", "count": 2}]}, {"name": "引凤先锋", "code": "PioneerForAttractingTalent", "total": 824, "dist": [{"dept": "京东零售", "count": 752}, {"dept": "京东工业", "count": 34}, {"dept": "京东健康", "count": 32}, {"dept": "未知", "count": 6}]}, {"name": "全域巡检官", "code": "AreaInspector", "total": 747, "dist": [{"dept": "京东零售", "count": 639}, {"dept": "京东健康", "count": 84}, {"dept": "京东工业", "count": 10}, {"dept": "未知", "count": 9}, {"dept": "CCO体系", "count": 5}]}, {"name": "自动化达人", "code": "IntelligentDrive", "total": 520, "dist": [{"dept": "京东零售", "count": 466}, {"dept": "未知", "count": 24}, {"dept": "京东健康", "count": 17}, {"dept": "京东工业", "count": 13}]}, {"name": "模板优选家", "code": "EfficiencyChampion", "total": 305, "dist": [{"dept": "京东零售", "count": 260}, {"dept": "京东健康", "count": 36}, {"dept": "京东工业", "count": 6}, {"dept": "未知", "count": 3}]}, {"name": "感恩共建", "code": "ProductCoCreators", "total": 213, "dist": [{"dept": "京东零售", "count": 185}, {"dept": "未知", "count": 17}, {"dept": "京东健康", "count": 7}, {"dept": "CCO体系", "count": 2}, {"dept": "国际事业群", "count": 1}, {"dept": "京东工业", "count": 1}]}, {"name": "创意体验官", "code": "CreativeExperienceOfficer", "total": 207, "dist": [{"dept": "京东零售", "count": 187}, {"dept": "京东健康", "count": 9}, {"dept": "CCO体系", "count": 5}, {"dept": "未知", "count": 3}, {"dept": "京东工业", "count": 2}, {"dept": "京东科技", "count": 1}]}, {"name": "原创制表人", "code": "OriginalStar", "total": 179, "dist": [{"dept": "京东零售", "count": 158}, {"dept": "京东健康", "count": 17}, {"dept": "京东工业", "count": 3}, {"dept": "CCO体系", "count": 1}]}, {"name": "AI智囊团", "code": "AIThinkTank", "total": 100, "dist": [{"dept": "京东零售", "count": 97}, {"dept": "未知", "count": 2}, {"dept": "京东健康", "count": 1}]}, {"name": "数据分享家", "code": "ShareTheVanguards", "total": 80, "dist": [{"dept": "京东零售", "count": 68}, {"dept": "京东健康", "count": 6}, {"dept": "京东工业", "count": 3}, {"dept": "未知", "count": 2}, {"dept": "CCO体系", "count": 1}]}, {"name": "开年锦鲤", "code": "LuckyFishAtNewYear", "total": 57, "dist": [{"dept": "京东零售", "count": 47}, {"dept": "未知", "count": 4}, {"dept": "京东健康", "count": 4}, {"dept": "京东工业", "count": 2}]}, {"name": "互动之星", "code": "InteractiveStar", "total": 55, "dist": [{"dept": "京东零售", "count": 52}, {"dept": "未知", "count": 2}, {"dept": "京东健康", "count": 1}]}, {"name": "AI智多星", "code": "AIResourcefulPerson", "total": 53, "dist": [{"dept": "京东零售", "count": 43}, {"dept": "未知", "count": 4}, {"dept": "京东健康", "count": 2}, {"dept": "CCO体系", "count": 2}, {"dept": "京东工业", "count": 1}, {"dept": "京东物流", "count": 1}]}, {"name": "超级分析师", "code": "SuperDataOfficer", "total": 35, "dist": [{"dept": "京东零售", "count": 32}, {"dept": "未知", "count": 2}, {"dept": "京东健康", "count": 1}]}, {"name": "榜样力量", "code": "RoleModelPower", "total": 33, "dist": [{"dept": "京东零售", "count": 30}, {"dept": "未知", "count": 2}, {"dept": "京东健康", "count": 1}]}, {"name": "创意模版师", "code": "CreativeTemplateDesigner", "total": 17, "dist": [{"dept": "京东零售", "count": 13}, {"dept": "未知", "count": 2}, {"dept": "京东工业", "count": 1}, {"dept": "京东健康", "count": 1}]}, {"name": "成长洞察官", "code": "GrowthInsightOfficer", "total": 13, "dist": [{"dept": "京东零售", "count": 10}, {"dept": "未知", "count": 2}, {"dept": "京东健康", "count": 1}]}, {"name": "成长共筑者", "code": "GrowtCoBuilder", "total": 6, "dist": [{"dept": "京东零售", "count": 6}]}, {"name": "信任授权家", "code": "TrustAuthorizationHome", "total": 1, "dist": [{"dept": "京东零售", "count": 1}]}, {"name": "协作代行人", "code": "CollaborativeProxy", "total": 1, "dist": [{"dept": "京东零售", "count": 1}]}, {"name": "流程智控师", "code": "ProcessIntelligenceController", "total": 1, "dist": [{"dept": "未知", "count": 1}]}, {"name": "应急守护人", "code": "EmergencyGuardian", "total": 1, "dist": [{"dept": "京东零售", "count": 1}]}, {"name": "新人带教家", "code": "NewcomerOnboardingHome", "total": 1, "dist": [{"dept": "京东零售", "count": 1}]}]}
+
+const TOTAL = DATA.totalUsersWithMedals;
+const fmt = n => n.toLocaleString('zh-CN');
+const pct = (n, d=TOTAL) => (n / d * 100).toFixed(2) + '%';
+
+// Tier
+function getTier(count) {
+  const rate = count / TOTAL * 100;
+  if (rate >= 30) return { label: 'S', cls: 'tier-s', color: '#ffd700' };
+  if (rate >= 10) return { label: 'A', cls: 'tier-a', color: '#4fc3f7' };
+  if (rate >= 3)  return { label: 'B', cls: 'tier-b', color: '#66bb6a' };
+  if (rate >= 0.5) return { label: 'C', cls: 'tier-c', color: '#ffa726' };
+  return { label: 'D', cls: 'tier-d', color: '#ab47bc' };
+}
+
+// Badges
+function purposeBadge(p) {
+  if (!p) return '<span style="color:#5a7a95">—</span>';
+  const m = {'活跃成长型':'purpose-huoyue','功能牵引型':'purpose-gongneng','活动激励型':'purpose-huodong','节日纪念型':'purpose-jieri'};
+  const ic = {'活跃成长型':'🌱','功能牵引型':'🔧','活动激励型':'🎁','节日纪念型':'🎊'};
+  return `<span class="type-badge ${m[p]||'purpose-huoyue'}">${ic[p]||'🏷️'} ${p}</span>`;
+}
+function typeBadge(t) {
+  if (!t) return '<span style="color:#5a7a95">—</span>';
+  const m = {'纪念勋章':'mt-jiyu','荣誉勋章':'mt-rongyu','成长勋章':'mt-chengzhang','限定勋章':'mt-xianding','新人成就':'mt-xinren'};
+  return `<span class="type-badge ${m[t]||''}">${t}</span>`;
+}
+function attrBadge(a) {
+  if (!a) return '<span style="color:#5a7a95">—</span>';
+  if (a.includes('升级')) return '<span class="type-badge attr-upgrade">📈 升级</span>';
+  return '<span class="type-badge attr-fixed">📌 非升级</span>';
+}
+
+// ============ KPI ============
+const kpis = [
+  { label: '获得勋章人数', value: fmt(TOTAL), unit: '累计有勋章用户', cls: 'highlight' },
+  { label: '勋章种类', value: DATA.uniqueMedals, unit: '种不同勋章', cls: 'success' },
+  { label: '人均勋章数', value: DATA.avgMedals, unit: '有勋章用户平均', cls: 'warning' },
+  { label: '中位数', value: DATA.medianMedals, unit: '枚勋章', cls: 'info' },
+  { label: '最高勋章数', value: DATA.maxMedals, unit: '枚（单人最高）', cls: 'warning' },
+  { label: '升级勋章', value: DATA.attrBreakdown['升级勋章']||0, unit: `种 / 非升级${DATA.attrBreakdown['非升级勋章']||0}种`, cls: 'rose' },
+  { label: '功能牵引型', value: DATA.purposeBreakdown['功能牵引型']||0, unit: '种（占比最大）', cls: 'cyan' },
+  { label: '采销岗', value: fmt(10439), unit: '人均5.30枚', cls: 'success' },
+  { label: '其他岗位', value: fmt(32740), unit: '人均5.30枚', cls: 'cyan' },
+];
+document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
+  <div class="kpi-card ${k.cls}">
+    <div class="label">${k.label}</div>
+    <div class="value">${k.value}</div>
+    <div class="unit">${k.unit}</div>
+  </div>
+`).join('');
+
+// ============ INSIGHTS ============
+const top1 = DATA.medals[0];
+const dTierCount = DATA.medals.filter(m => m.count / TOTAL * 100 < 0.5).length;
+const singleMedalPct = (DATA.distribution.find(d=>d.count===1).users / TOTAL * 100).toFixed(1);
+const singleMedalUsers = DATA.distribution.find(d=>d.count===1).users;
+const highMedalUsers = DATA.ranges.filter(r => ['16-20枚','21-25枚','26枚以上'].includes(r.label)).reduce((s,r) => s + r.count, 0);
+const lowMedalUsers = DATA.ranges.filter(r => ['1枚','2-3枚'].includes(r.label)).reduce((s,r) => s + r.count, 0);
+const upgradeMedals = DATA.medals.filter(m => m.attribute && m.attribute.includes('升级'));
+const nonUpgradeMedals = DATA.medals.filter(m => m.attribute && !m.attribute.includes('升级'));
+const upgradeTotalUsers = upgradeMedals.reduce((s,m) => s + m.count, 0);
+const nonUpgradeTotalUsers = nonUpgradeMedals.reduce((s,m) => s + m.count, 0);
+
+const insights = [
+  {
+    title: '🔑 核心发现',
+    text: `"${top1.name}"是最普及的勋章，<span class="hl">${fmt(top1.count)}</span> 人获得。D级勋章 <span class="hl">${dTierCount}</span> 种获得率极低，3枚测试勋章应清理。升级勋章与非升级勋章各 <span class="hl">${DATA.attrBreakdown['升级勋章']||0}</span> 种 vs <span class="hl">${DATA.attrBreakdown['非升级勋章']||0}</span> 种。`
+  },
+  {
+    title: '📊 持有量分布',
+    text: `<span class="hl">${singleMedalPct}%</span> 的有勋章用户仅持1枚（<span class="hl">${fmt(singleMedalUsers)}</span> 人），1-3枚用户合计占 <span class="hl">${(lowMedalUsers/TOTAL*100).toFixed(1)}%</span>，而16枚以上"勋章达人"仅 <span class="hl">${fmt(highMedalUsers)}</span> 人。两极分化严重，中位数仅 <span class="hl">${DATA.medianMedals}</span> 枚。`
+  },
+  {
+    title: '🏷️ 维度洞察',
+    text: `按目的：功能牵引型 <span class="hl">${DATA.purposeBreakdown['功能牵引型']||0}</span> 种最多但人均获得偏低；节日纪念型 <span class="hl">${DATA.purposeBreakdown['节日纪念型']||0}</span> 种覆盖最广。升级勋章总获得 <span class="hl">${fmt(upgradeTotalUsers)}</span> 人次，非升级 <span class="hl">${fmt(nonUpgradeTotalUsers)}</span> 人次。`
+  },
+  {
+    title: '🏢 部门差异 — 各部门勋章分布不均',
+    text: `京东零售人均 <span class="hl">7.03</span> 枚最高，京东健康 <span class="hl">7.26</span> 枚紧随其后，而京东物流仅 <span class="hl">2.10</span> 枚、京东科技仅 <span class="hl">1.87</span> 枚，部门间差距悬殊。京东物流 <span class="hl">37.9%</span> 仅持1枚，CHO体系 <span class="hl">54.7%</span> 仅持1枚，这些部门勋章渗透率明显偏低，需针对性推广。`
+  },
+  {
+    title: '⚠️ 体系风险 — D级勋章占比过高',
+    text: `46种勋章中，获得率不足0.5%的D级勋章有 <span class="hl">${dTierCount}</span> 种，占全部的${(dTierCount/DATA.uniqueMedals*100).toFixed(0)}%。其中4枚刚上线仅1人获得，多枚为白名单限定，形同虚设。中间档位（A级10种 + B级${DATA.medals.filter(m=>{const r=m.count/TOTAL*100;return r>=3&&r<10;}).length}种 + C级5种 = ${10+DATA.medals.filter(m=>{const r=m.count/TOTAL*100;return r>=3&&r<10;}).length+5}种）占46%，是体系主体并不断层。S级${DATA.medals.filter(m=>m.count/TOTAL*100>=30).length}种多为节日登录型，有其设计合理性。核心问题是：D级勋章过多，应清理无效勋章、降低铜级门槛，让更多勋章"够得着"。`
+  }
+];
+document.getElementById('insights').innerHTML = insights.map(i => `
+  <div class="insight-box">
+    <div class="insight-title">${i.title}</div>
+    <div class="insight-text">${i.text}</div>
+  </div>
+`).join('');
+
+// ============ NEW: USER DISTRIBUTION CHART ============
+// Highlight cards
+const distHL = [
+  { label: '仅1枚勋章', value: fmt(singleMedalUsers), sub: `占 ${singleMedalPct}%`, color: '#ef5350' },
+  { label: '2-3枚', value: fmt(DATA.ranges.find(r=>r.label==='2-3枚').count), sub: `占 ${(DATA.ranges.find(r=>r.label==='2-3枚').count/TOTAL*100).toFixed(1)}%`, color: '#ffa726' },
+  { label: '4-10枚（腰部）', value: fmt(DATA.ranges.filter(r=>['4-5枚','6-10枚'].includes(r.label)).reduce((s,r)=>s+r.count,0)), sub: '核心进阶区间', color: '#4fc3f7' },
+  { label: '11-20枚（资深）', value: fmt(DATA.ranges.filter(r=>['11-15枚','16-20枚'].includes(r.label)).reduce((s,r)=>s+r.count,0)), sub: '高频活跃用户', color: '#66bb6a' },
+  { label: '21枚以上（达人）', value: fmt(DATA.ranges.filter(r=>['21-25枚','26枚以上'].includes(r.label)).reduce((s,r)=>s+r.count,0)), sub: '勋章收藏家', color: '#ab47bc' },
+];
+document.getElementById('distHighlight').innerHTML = distHL.map(d => `
+  <div class="dist-card">
+    <div class="dist-label">${d.label}</div>
+    <div class="dist-value" style="color:${d.color}">${d.value}</div>
+    <div class="dist-sub">${d.sub}</div>
+  </div>
+`).join('');
+
+// Full distribution bar chart
+const distChartData = DATA.distribution.filter(d => d.users > 0);
+new Chart(document.getElementById('chartUserDist'), {
+  type: 'bar',
+  data: {
+    labels: distChartData.map(d => d.count + '枚'),
+    datasets: [{
+      label: '人数',
+      data: distChartData.map(d => d.users),
+      backgroundColor: distChartData.map(d => {
+        if (d.count <= 1) return 'rgba(239,83,80,0.75)';
+        if (d.count <= 3) return 'rgba(255,167,38,0.75)';
+        if (d.count <= 10) return 'rgba(79,195,247,0.75)';
+        if (d.count <= 20) return 'rgba(102,187,106,0.75)';
+        return 'rgba(171,71,188,0.75)';
+      }),
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${fmt(ctx.raw)} 人 (${(ctx.raw / TOTAL * 100).toFixed(1)}%)`
+        }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, title: { display: true, text: '持有勋章数量', color: '#7a9bb5' }, ticks: { font: { size: 11 } } },
+      y: { grid: { color: '#1e3550' }, title: { display: true, text: '用户人数', color: '#7a9bb5' }, beginAtZero: true }
+    }
+  }
+});
+
+// ============ DIMENSION OVERVIEW ============
+const purposeColors = { '活跃成长型':'#4fc3f7', '功能牵引型':'#66bb6a', '活动激励型':'#ffa726', '节日纪念型':'#f06292' };
+const purposeIcons = { '活跃成长型':'🌱', '功能牵引型':'🔧', '活动激励型':'🎁', '节日纪念型':'🎊' };
+
+let dimHtml = '';
+for (const [p, cnt] of Object.entries(DATA.purposeBreakdown)) {
+  const uc = DATA.purposeUserCounts[p] || 0;
+  dimHtml += `<div class="dim-stat"><div class="dim-label">${purposeIcons[p]||''} ${p}</div><div class="dim-value">${cnt}</div><div class="dim-sub">种 · ${fmt(uc)} 人次</div></div>`;
+}
+document.getElementById('dimStats').innerHTML = dimHtml;
+
+// Purpose doughnut
+const pLabels = Object.keys(DATA.purposeBreakdown);
+new Chart(document.getElementById('chartPurpose'), {
+  type: 'doughnut',
+  data: {
+    labels: pLabels.map(l => `${purposeIcons[l]||''} ${l} (${DATA.purposeBreakdown[l]}种)`),
+    datasets: [{ data: pLabels.map(l => DATA.purposeBreakdown[l]), backgroundColor: pLabels.map(l => (purposeColors[l]||'#888')+'cc'), borderColor: '#162636', borderWidth: 2 }]
+  },
+  options: { responsive: true, plugins: { legend: { position:'bottom', labels:{ padding:10, usePointStyle:true, font:{size:11} } }, title: { display:true, text:'按目的类型（种类数）', color:'#b0d4f1', font:{size:13} } } }
+});
+
+// Type doughnut
+const tLabels = Object.keys(DATA.typeBreakdown);
+const tColors = ['#ffd700','#4fc3f7','#66bb6a','#ab47bc','#26c6da'];
+new Chart(document.getElementById('chartType'), {
+  type: 'doughnut',
+  data: {
+    labels: tLabels.map(l => `${l} (${DATA.typeBreakdown[l]}种)`),
+    datasets: [{ data: tLabels.map(l => DATA.typeBreakdown[l]), backgroundColor: tColors.slice(0, tLabels.length), borderColor: '#162636', borderWidth: 2 }]
+  },
+  options: { responsive: true, plugins: { legend: { position:'bottom', labels:{ padding:8, usePointStyle:true, font:{size:10} } }, title: { display:true, text:'按勋章类型（种类数）', color:'#b0d4f1', font:{size:13} } } }
+});
+
+// Attr doughnut
+const aLabels = Object.keys(DATA.attrBreakdown);
+new Chart(document.getElementById('chartAttr'), {
+  type: 'doughnut',
+  data: {
+    labels: aLabels.map(l => `${l} (${DATA.attrBreakdown[l]}种)`),
+    datasets: [{ data: aLabels.map(l => DATA.attrBreakdown[l]), backgroundColor: ['rgba(171,71,188,0.8)','rgba(78,182,154,0.8)'], borderColor: '#162636', borderWidth: 2 }]
+  },
+  options: { responsive: true, plugins: { legend: { position:'bottom', labels:{ padding:10, usePointStyle:true, font:{size:11} } }, title: { display:true, text:'按勋章属性（种类数）', color:'#b0d4f1', font:{size:13} } } }
+});
+
+// Purpose stacked bar
+const purposeBarMedals = {};
+for (const m of DATA.medals) { const p = m.purpose||'未分类'; if(!purposeBarMedals[p]) purposeBarMedals[p]=[]; purposeBarMedals[p].push(m); }
+const pBarLabels = Object.keys(purposeBarMedals).sort((a,b) => purposeBarMedals[b].reduce((s,m)=>s+m.count,0) - purposeBarMedals[a].reduce((s,m)=>s+m.count,0));
+new Chart(document.getElementById('chartPurposeBar'), {
+  type: 'bar',
+  data: {
+    labels: ['获得人次'],
+    datasets: pBarLabels.map(p => ({
+      label: p,
+      data: [purposeBarMedals[p].reduce((s,m)=>s+m.count,0)],
+      backgroundColor: (purposeColors[p]||'#888')+'aa',
+      borderRadius: 4,
+    }))
+  },
+  options: {
+    indexAxis: 'y', responsive: true,
+    plugins: { legend: { position:'bottom', labels:{ padding:12, usePointStyle:true } }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)} 人次` } } },
+    scales: { x: { stacked:true, grid:{color:'#1e3550'}, title:{display:true,text:'获得人次',color:'#7a9bb5'} }, y: { stacked:true, grid:{display:false} } }
+  }
+});
+
+// ============ RECOMMENDATIONS ============
+const bTierCount = DATA.medals.filter(m => { const r=m.count/TOTAL*100; return r>=3&&r<10; }).length;
+const gongnengMedals = DATA.medals.filter(m=>m.purpose==='功能牵引型');
+const gongnengLowRate = gongnengMedals.filter(m=>m.count/TOTAL*100<1).length;
+const upgradeWithLowRate = upgradeMedals.filter(m=>m.count/TOTAL*100<1).length;
+const jieriMedals = DATA.medals.filter(m=>m.purpose==='节日纪念型');
+const jieriHighRate = jieriMedals.filter(m=>m.count/TOTAL*100>20).length;
+
+const recommendations = [
+  {
+    icon: '🎯', title: '降低首枚勋章获取门槛', tag: '紧急', tagCls: 'tag-urgent',
+    body: `<span class="m">${singleMedalPct}%</span> 的有勋章用户仅持1枚（<span class="m">${fmt(singleMedalUsers)}</span> 人），1-3枚用户合计占 <span class="m">${(lowMedalUsers/TOTAL*100).toFixed(1)}%</span>。大量用户在获得首枚勋章后便"流失"，勋章体系对他们形同虚设。`,
+    action: `设置"新手引导勋章"：登录3天、完成首次AI搜索、首次使用工具箱等即可获得，将1枚用户向2-3枚转化。在首枚勋章获得时推送"下一个目标"引导卡，形成递进式激励。`
+  },
+  {
+    icon: '🪜', title: '优化D级勋章，提升可及性', tag: '重要', tagCls: 'tag-important',
+    body: `D级勋章（获得率<0.5%）多达 <span class="m">${dTierCount}</span> 种，占全部的${(dTierCount/DATA.uniqueMedals*100).toFixed(0)}%。中间档位（A级10种+B级7种+C级5种=22种）不断层，核心问题是D级过多。其中4枚刚上线仅1人获得、多枚为白名单限定，用户根本"够不着"。`,
+    action: `① 立即下线测试勋章（获得人数=1的刚上线勋章除外）；② 将白名单勋章改为参与即得，扩大覆盖；③ 降低铜级门槛，让D级勋章向C/B级转化（如"AI巡检使用1个技能"→"打开巡检页面"即可获得铜级）；④ 新勋章上线前设定最低发放目标（月发放≥50人），未达标则调整门槛。`
+  },
+  {
+    icon: '🔧', title: '功能牵引型勋章门槛优化', tag: '重要', tagCls: 'tag-important',
+    body: `功能牵引型共 <span class="m">${gongnengMedals.length}</span> 种（占${DATA.uniqueMedals}种的${(gongnengMedals.length/DATA.uniqueMedals*100).toFixed(0)}%），是种类最多的类型。但其中 <span class="m">${gongnengLowRate}</span> 种获得率不足1%，说明门槛偏高或入口不清，未能有效牵引功能使用。`,
+    action: `逐一审查低获得率的功能牵引型勋章：① 降低铜勋章门槛（如"AI巡检专员使用1个技能"→"打开AI巡检专员页面"）；② 在对应功能页面增加勋章入口引导；③ 新用户首次使用功能时弹出勋章预告。核心目标是提升功能渗透率，而非设高门槛。`
+  },
+  {
+    icon: '📈', title: '升级勋章差异化运营', tag: '重要', tagCls: 'tag-important',
+    body: `升级勋章 <span class="m">${DATA.attrBreakdown['升级勋章']||0}</span> 种 vs 非升级 <span class="m">${DATA.attrBreakdown['非升级勋章']||0}</span> 种，数量持平。但 <span class="m">${upgradeWithLowRate}</span> 种升级勋章获得率不足1%，铜级门槛可能仍然过高，用户根本无法"入门"更遑论"升级"。`,
+    action: `① 降低升级勋章的铜级门槛，确保铜级获得率≥10%，作为"试用"激励；② 银级目标5-15%，金级目标1-3%，形成清晰的进阶路径；③ 当用户获得铜勋章时，推送"距银勋章还需XX步"的进度提示，驱动升级行为；④ 考虑为已获得铜级的用户发送银级攻略推送。`
+  },
+  {
+    icon: '🎊', title: '节日纪念勋章防通胀', tag: '建议', tagCls: 'tag-suggest',
+    body: `节日纪念型 <span class="m">${jieriMedals.length}</span> 种，其中 <span class="m">${jieriHighRate}</span> 种获得率超20%。此类勋章门槛低（登录即得），短期提升活跃但长期稀释含金量。`,
+    action: `① 节日勋章保持"登录领取"的简单规则，但增加时效性（限时7天领取，逾期不可补）；② 考虑为连续多年领取同一节日勋章的用户升级为"资深版"（如连续2年领取春节勋章→"新春常驻"标签）；③ 严格管控节日勋章数量，避免每月都有节日勋章导致通胀。`
+  },
+  {
+    icon: '💎', title: '清理/激活长尾D级勋章', tag: '建议', tagCls: 'tag-suggest',
+    body: `D级勋章 <span class="m">${dTierCount}</span> 种获得率不足0.5%。其中3枚为测试勋章（CeShi系列），"流程质控师"仅1人，"成长共筑者"仅6人。`,
+    action: `① 立即下线3枚测试勋章；② 对获得人数<10的勋章标记"休眠"并审查获取路径；③ 对连续6个月无人新获得的勋章考虑归档或重新设计；④ 新勋章上线前设定最低发放目标（如月发放≥50人），未达标则调整门槛。`
+  },
+  {
+    icon: '🎁', title: '活动激励勋章做"事件营销"', tag: '战略', tagCls: 'tag-strategic',
+    body: `活动激励型 <span class="m">${DATA.purposeBreakdown['活动激励型']||0}</span> 种，但多为白名单/限定勋章，普通用户无法参与。获得总人次仅 <span class="m">${fmt(DATA.purposeUserCounts['活动激励型']||0)}</span>，占比偏低。`,
+    action: `① 将部分活动勋章从"白名单"改为"参与即得"模式，降低参与门槛提升覆盖；② 设置"活动勋章收集任务"：集齐3枚活动勋章解锁额外奖励；③ 在活动结束后的1周内推送活动回顾+勋章展示，强化仪式感；④ 每季度至少设计1次全员可参与的活动勋章。`
+  },
+  {
+    icon: '📐', title: '建立勋章健康度评估模型', tag: '战略', tagCls: 'tag-strategic',
+    body: `当前46种勋章中有效发挥激励作用的估计不足一半。缺乏定期评估机制，无法判断哪些勋章需要调整、哪些应该淘汰。`,
+    action: `建立季度评估机制：① 核心指标：覆盖率、中位数、1枚用户占比、腰部勋章占比；② 单勋章指标：发放率趋势、获取后7日留存提升、功能使用率提升（功能牵引型）；③ 健康标准：中位数≥5枚、1枚用户占比≤25%、B级勋章≥8种；④ 每季度产出评估报告，指导下一季度勋章调整。`
+  }
+];
+
+document.getElementById('recommendations').innerHTML = recommendations.map(r => `
+  <div class="rec-card">
+    <div class="rec-header">
+      <span class="rec-icon">${r.icon}</span>
+      <span class="rec-title">${r.title}</span>
+      <span class="rec-tag ${r.tagCls}">${r.tag}</span>
+    </div>
+    <div class="rec-body">${r.body}</div>
+    <div class="rec-action">${r.action}</div>
+  </div>
+`).join('');
+
+// ============ MEDAL TABLE ============
+const maxCount = DATA.medals[0].count;
+let sortField = 'count', sortAsc = false, filterPurpose = '', filterType = '';
+
+function renderTable() {
+  let filtered = DATA.medals;
+  if (filterPurpose) filtered = filtered.filter(m => m.purpose === filterPurpose);
+  if (filterType) filtered = filtered.filter(m => m.medal_type === filterType);
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortField === 'name') return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+    if (sortField === 'purpose') return sortAsc ? (a.purpose||'').localeCompare(b.purpose||'') : (b.purpose||'').localeCompare(a.purpose||'');
+    if (sortField === 'type') return sortAsc ? (a.medal_type||'').localeCompare(b.medal_type||'') : (b.medal_type||'').localeCompare(a.medal_type||'');
+    return sortAsc ? a.count - b.count : b.count - a.count;
+  });
+  document.getElementById('medalTable').innerHTML = sorted.map((m, i) => {
+    const tier = getTier(m.count);
+    const barW = m.count / maxCount * 100;
+    const rankCls = i<1?'rank-top1':i<2?'rank-top2':i<3?'rank-top3':'';
+    return `<tr>
+      <td class="rank ${rankCls}">${i+1}</td>
+      <td class="medal-name">${m.name}</td>
+      <td class="medal-code">${m.code}</td>
+      <td>${purposeBadge(m.purpose)}</td>
+      <td>${typeBadge(m.medal_type)}</td>
+      <td>${attrBadge(m.attribute)}</td>
+      <td class="count">${fmt(m.count)}</td>
+      <td class="pct" style="color:${tier.color};font-weight:600">${pct(m.count)}</td>
+      <td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:${tier.color}"></div></div></td>
+      <td><span class="tier-badge ${tier.cls}" title="${tier.label==='S'?'超过30%的人都有，人人可得':tier.label==='A'?'10-30%的人有，较易获得':tier.label==='B'?'3-10%的人有，进阶区间':tier.label==='C'?'0.5-3%的人有，有一定难度':'不到0.5%的人有，极难获得'}">${tier.label}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+const sortOptions = [{field:'count',label:'按人数'},{field:'name',label:'按名称'},{field:'purpose',label:'按目的'},{field:'type',label:'按类型'}];
+const pFilterOpts = ['', ...Object.keys(DATA.purposeBreakdown)];
+const tFilterOpts = ['', ...Object.keys(DATA.typeBreakdown)];
+
+document.getElementById('sortBtns').innerHTML =
+  sortOptions.map(s => `<button class="sort-btn${s.field===sortField?' active':''}" data-field="${s.field}">${s.label}</button>`).join('') +
+  `<button class="sort-btn" id="sortDirBtn">倒序 ↕</button>` +
+  `<span class="filter-label" style="margin-left:12px">目的：</span>` +
+  pFilterOpts.map(p => `<button class="sort-btn${p===filterPurpose?' active':''}" data-purpose="${p}">${p||'全部'}</button>`).join('') +
+  `<span class="filter-label" style="margin-left:8px">类型：</span>` +
+  tFilterOpts.map(t => `<button class="sort-btn${t===filterType?' active':''}" data-type="${t}">${t||'全部'}</button>`).join('');
+
+document.querySelectorAll('.sort-btn[data-field]').forEach(btn => {
+  btn.addEventListener('click', () => { sortField=btn.dataset.field; document.querySelectorAll('.sort-btn[data-field]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderTable(); });
+});
+document.getElementById('sortDirBtn').addEventListener('click', () => { sortAsc=!sortAsc; document.getElementById('sortDirBtn').textContent=sortAsc?'正序 ↕':'倒序 ↕'; renderTable(); });
+document.querySelectorAll('.sort-btn[data-purpose]').forEach(btn => {
+  btn.addEventListener('click', () => { filterPurpose=btn.dataset.purpose; document.querySelectorAll('.sort-btn[data-purpose]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderTable(); });
+});
+document.querySelectorAll('.sort-btn[data-type]').forEach(btn => {
+  btn.addEventListener('click', () => { filterType=btn.dataset.type; document.querySelectorAll('.sort-btn[data-type]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderTable(); });
+});
+renderTable();
+
+// ============ TIMELINE TABLE ============
+const timelineMedals = DATA.medals.filter(m => m.launch_date && m.launch_date !== 'None');
+document.getElementById('timelineTable').innerHTML = timelineMedals.map(m => `
+  <tr>
+    <td class="medal-name">${m.name}</td>
+    <td>${purposeBadge(m.purpose)}</td>
+    <td>${typeBadge(m.medal_type)}</td>
+    <td>${attrBadge(m.attribute)}</td>
+    <td style="color:#b0d4f1;font-size:12px;max-width:280px;white-space:normal;line-height:1.5">${(m.rule||'—').replace(/\n/g,'<br>')}</td>
+    <td style="color:#ffa726;font-size:12px">${m.launch_date}</td>
+    <td class="count">${fmt(m.count)}</td>
+  </tr>
+`).join('');
+
+// ============ CHARTS ============
+Chart.defaults.font.family = "-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif";
+Chart.defaults.color = '#7a9bb5';
+
+// Top 20
+const top20 = DATA.medals.slice(0, 20);
+new Chart(document.getElementById('chartTopMedals'), {
+  type: 'bar',
+  data: {
+    labels: top20.map(m=>m.name),
+    datasets: [{ label:'获得人数', data:top20.map(m=>m.count), backgroundColor:top20.map(m=>{const r=m.count/TOTAL*100; if(r>=30)return'rgba(255,215,0,0.7)'; if(r>=10)return'rgba(79,195,247,0.7)'; if(r>=3)return'rgba(102,187,106,0.7)'; if(r>=0.5)return'rgba(255,167,38,0.7)'; return'rgba(171,71,188,0.7)';}), borderRadius:4 }]
+  },
+  options: { indexAxis:'y', responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`获得人数: ${fmt(ctx.raw)} (${pct(ctx.raw)})`}} }, scales:{ x:{grid:{color:'#1e3550'},title:{display:true,text:'获得人数',color:'#7a9bb5'}}, y:{grid:{display:false},ticks:{font:{size:11}}} } }
+});
+
+// Ranges
+const rangeColors = ['#ef5350','#ffa726','#4fc3f7','#4fc3f7','#66bb6a','#66bb6a','#ab47bc','#ab47bc'];
+new Chart(document.getElementById('chartRanges'), {
+  type: 'bar',
+  data: { labels:DATA.ranges.map(r=>r.label), datasets:[{ label:'人数', data:DATA.ranges.map(r=>r.count), backgroundColor:rangeColors, borderRadius:6 }] },
+  options: { responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${fmt(ctx.raw)} 人 (${(ctx.raw/TOTAL*100).toFixed(1)}%)`}} }, scales:{ x:{grid:{display:false}}, y:{grid:{color:'#1e3550'},title:{display:true,text:'人数',color:'#7a9bb5'}} } }
+});
+
+// Tier pie
+const tiers = {S:0,A:0,B:0,C:0,D:0};
+DATA.medals.forEach(m=>{tiers[getTier(m.count).label]++});
+new Chart(document.getElementById('chartTierPie'), {
+  type: 'doughnut',
+  data: { labels:[`S级 人人可得(≥30%): ${tiers.S}种`,`A级 较易获得(10-30%): ${tiers.A}种`,`B级 进阶区间(3-10%): ${tiers.B}种`,`C级 有一定难度(0.5-3%): ${tiers.C}种`,`D级 极难获得(<0.5%): ${tiers.D}种`], datasets:[{data:[tiers.S,tiers.A,tiers.B,tiers.C,tiers.D],backgroundColor:['rgba(255,215,0,0.8)','rgba(79,195,247,0.8)','rgba(102,187,106,0.8)','rgba(255,167,38,0.8)','rgba(171,71,188,0.8)'],borderColor:'#162636',borderWidth:2}] },
+  options: { responsive:true, plugins:{ legend:{position:'bottom',labels:{padding:14,usePointStyle:true}} } }
+});
+
+// Distribution
+const distData = DATA.distribution.filter(d=>d.users>0);
+new Chart(document.getElementById('chartDist'), {
+  type: 'bar',
+  data: { labels:distData.map(d=>d.count+'枚'), datasets:[{label:'人数',data:distData.map(d=>d.users),backgroundColor:distData.map(d=>{if(d.count<=2)return'rgba(79,195,247,0.7)';if(d.count<=5)return'rgba(102,187,106,0.7)';if(d.count<=10)return'rgba(255,167,38,0.7)';if(d.count<=20)return'rgba(239,83,80,0.7)';return'rgba(171,71,188,0.7)';}),borderRadius:3}] },
+  options: { responsive:true, plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${fmt(ctx.raw)} 人 (${(ctx.raw/TOTAL*100).toFixed(1)}%)`}}}, scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'#1e3550'},title:{display:true,text:'人数',color:'#7a9bb5'}}} }
+});
+
+// Percentile
+const percentiles = [
+  {label:'P10',value:DATA.percentiles.p10},{label:'P25',value:DATA.percentiles.p25},
+  {label:'P50(中位数)',value:DATA.percentiles.p50},{label:'P75',value:DATA.percentiles.p75},
+  {label:'P90',value:DATA.percentiles.p90},{label:'P95',value:DATA.percentiles.p95},
+  {label:'P99',value:DATA.percentiles.p99},
+];
+document.getElementById('percentileBar').innerHTML = percentiles.map(p=>`
+  <div class="percentile-row">
+    <div class="percentile-label">${p.label}</div>
+    <div class="percentile-track"><div class="percentile-fill" style="width:${p.value/DATA.maxMedals*100}%"></div></div>
+    <div class="percentile-value">${p.value}枚</div>
+  </div>
+`).join('');
+
+// Co-occurrence
+new Chart(document.getElementById('chartCooccurrence'), {
+  type: 'bar',
+  data: { labels:DATA.topPairs.map(p=>`${p.medal1} × ${p.medal2}`), datasets:[{label:'共现人数',data:DATA.topPairs.map(p=>p.count),backgroundColor:'rgba(79,195,247,0.6)',borderRadius:4}] },
+  options: { indexAxis:'y', responsive:true, plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${fmt(ctx.raw)} 人同时拥有 (${pct(ctx.raw)})`}}}, scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'共现人数',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:11}}}} }
+});
+
+// Cumulative
+const cumData = DATA.distribution.map(d => {
+  const ge = DATA.distribution.filter(dd=>dd.count>=d.count).reduce((s,dd)=>s+dd.users,0);
+  return {count:d.count, pct:+(ge/TOTAL*100).toFixed(2)};
+}).filter(d=>DATA.distribution.find(dd=>dd.count===d.count).users>0);
+
+new Chart(document.getElementById('chartCumulative'), {
+  type: 'line',
+  data: { labels:cumData.map(d=>d.count+'枚'), datasets:[{label:'累计占比(%)',data:cumData.map(d=>d.pct),borderColor:'#4fc3f7',backgroundColor:'rgba(79,195,247,0.1)',fill:true,tension:0.3,pointRadius:2,pointHoverRadius:5}] },
+  options: { responsive:true, plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`拥有 ≥ ${ctx.dataIndex+1} 枚: ${ctx.raw}% 的用户`}}}, scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'勋章数量',color:'#7a9bb5'}},y:{grid:{color:'#1e3550'},title:{display:true,text:'累计用户占比(%)',color:'#7a9bb5'},min:0,max:100}} }
+});
+
+// ============ DEPARTMENT ANALYSIS ============
+const DEPT = {"deptSummary":[{"name":"京东零售","total":25128,"avg":7.03,"median":4,"max":38,"singleCount":5258,"singleRate":20.9,"medalTotal":176555,"top5":[{"name":"66大顺","count":24555},{"name":"端午安康","count":13666},{"name":"时间合伙人","count":13661},{"name":"奋斗足迹","count":11503},{"name":"持之以恒","count":11494}]},{"name":"京东物流","total":12495,"avg":2.1,"median":2,"max":18,"singleCount":4730,"singleRate":37.9,"medalTotal":26212,"top5":[{"name":"66大顺","count":12491},{"name":"时间合伙人","count":6852},{"name":"端午安康","count":3551},{"name":"奋斗足迹","count":2132},{"name":"新春贺岁","count":628}]},{"name":"CCO体系","total":1629,"avg":3.62,"median":2,"max":20,"singleCount":679,"singleRate":41.7,"medalTotal":5898,"top5":[{"name":"66大顺","count":1621},{"name":"时间合伙人","count":733},{"name":"端午安康","count":488},{"name":"新春贺岁","count":360},{"name":"奋斗足迹","count":336}]},{"name":"京东健康","total":1479,"avg":7.26,"median":4,"max":24,"singleCount":310,"singleRate":21,"medalTotal":10742,"top5":[{"name":"66大顺","count":1463},{"name":"端午安康","count":874},{"name":"奋斗足迹","count":755},{"name":"时间合伙人","count":747},{"name":"持之以恒","count":726}]},{"name":"京东工业","total":995,"avg":6.42,"median":4,"max":24,"singleCount":166,"singleRate":16.7,"medalTotal":6390,"top5":[{"name":"66大顺","count":987},{"name":"端午安康","count":637},{"name":"时间合伙人","count":609},{"name":"奋斗足迹","count":524},{"name":"新春贺岁","count":346}]},{"name":"京东科技","total":734,"avg":1.87,"median":1,"max":18,"singleCount":419,"singleRate":57.1,"medalTotal":1371,"top5":[{"name":"66大顺","count":721},{"name":"时间合伙人","count":236},{"name":"端午安康","count":137},{"name":"新春贺岁","count":60},{"name":"奋斗足迹","count":36}]},{"name":"CFO体系","total":362,"avg":2,"median":2,"max":9,"singleCount":161,"singleRate":44.5,"medalTotal":723,"top5":[{"name":"66大顺","count":360},{"name":"时间合伙人","count":160},{"name":"端午安康","count":71},{"name":"新春贺岁","count":55},{"name":"奋斗足迹","count":37}]},{"name":"CHO体系","total":203,"avg":1.87,"median":1,"max":12,"singleCount":111,"singleRate":54.7,"medalTotal":379,"top5":[{"name":"66大顺","count":203},{"name":"时间合伙人","count":75},{"name":"端午安康","count":32},{"name":"新春贺岁","count":19},{"name":"奋斗足迹","count":8}]},{"name":"国际事业群","total":76,"avg":3.37,"median":2,"max":16,"singleCount":23,"singleRate":30.3,"medalTotal":256,"top5":[{"name":"66大顺","count":73},{"name":"时间合伙人","count":27},{"name":"端午安康","count":23},{"name":"新春贺岁","count":22},{"name":"持之以恒","count":17}]},{"name":"京东产发","total":43,"avg":1.58,"median":1,"max":3,"singleCount":25,"singleRate":58.1,"medalTotal":68,"top5":[{"name":"66大顺","count":42},{"name":"时间合伙人","count":16},{"name":"端午安康","count":5},{"name":"奋斗足迹","count":4},{"name":"战斗印记","count":1}]},{"name":"总裁办公室","total":22,"avg":2.05,"median":1,"max":10,"singleCount":12,"singleRate":54.5,"medalTotal":45,"top5":[{"name":"66大顺","count":22},{"name":"时间合伙人","count":8},{"name":"持之以恒","count":3},{"name":"日积月累","count":2},{"name":"奋斗足迹","count":2}]},{"name":"探索研究院","total":7,"avg":1.14,"median":1,"max":2,"singleCount":6,"singleRate":85.7,"medalTotal":8,"top5":[{"name":"66大顺","count":7},{"name":"端午安康","count":1}]},{"name":"综合部","total":4,"avg":3.5,"median":3,"max":7,"singleCount":1,"singleRate":25,"medalTotal":14,"top5":[{"name":"66大顺","count":4},{"name":"持之以恒","count":3},{"name":"全域探索","count":2},{"name":"新春贺岁","count":2},{"name":"智驭能手","count":1}]},{"name":"战略部","total":2,"avg":3.5,"median":5,"max":5,"singleCount":0,"singleRate":0,"medalTotal":7,"top5":[{"name":"66大顺","count":2},{"name":"时间合伙人","count":2},{"name":"日积月累","count":1},{"name":"持之以恒","count":1},{"name":"智学先锋","count":1}]}],"dept2Summary":{"京东零售":[{"name":"大商超事业群","total":2384,"avg":12.85,"singleRate":2.3,"medalTotal":30635},{"name":"大时尚事业群","total":1406,"avg":12.59,"singleRate":3.4,"medalTotal":17707},{"name":"3C数码事业群","total":1705,"avg":12.44,"singleRate":3.5,"medalTotal":21212},{"name":"跨境事业部","total":478,"avg":11.45,"singleRate":5,"medalTotal":5472},{"name":"京喜事业部","total":1084,"avg":10.77,"singleRate":3.2,"medalTotal":11676},{"name":"自有品牌业务部","total":403,"avg":9.35,"singleRate":7.4,"medalTotal":3768},{"name":"汽车事业部","total":610,"avg":9.21,"singleRate":14.1,"medalTotal":5619},{"name":"家电家居事业群","total":5800,"avg":7.95,"singleRate":15.5,"medalTotal":46124},{"name":"创新零售事业群","total":1643,"avg":5.79,"singleRate":19.2,"medalTotal":9514},{"name":"Y事业部","total":469,"avg":3.89,"singleRate":20.7,"medalTotal":1823},{"name":"平台产品与研发中心","total":1781,"avg":3.67,"singleRate":30.9,"medalTotal":6541},{"name":"本地生活服务事业群","total":379,"avg":3.67,"singleRate":41.7,"medalTotal":1391},{"name":"平台生态部","total":396,"avg":3.62,"singleRate":31.6,"medalTotal":1434},{"name":"拍卖业务部","total":29,"avg":2.69,"singleRate":41.4,"medalTotal":78},{"name":"拍拍二手业务部","total":5,"avg":2.6,"singleRate":40,"medalTotal":13},{"name":"平台营销中心","total":282,"avg":2.3,"singleRate":39.4,"medalTotal":650},{"name":"客户体验与服务部","total":6226,"avg":2.06,"singleRate":42.2,"medalTotal":12802},{"name":"赛夫事业部","total":45,"avg":2,"singleRate":55.6,"medalTotal":90},{"name":"战略与综合支持部","total":3,"avg":2,"singleRate":33.3,"medalTotal":6}],"京东物流":[{"name":"欧洲区","total":12,"avg":3,"singleRate":50,"medalTotal":36},{"name":"综合人才部","total":2,"avg":3,"singleRate":0,"medalTotal":6},{"name":"市场与公共事务部","total":27,"avg":2.33,"singleRate":37,"medalTotal":63},{"name":"服务业务部","total":280,"avg":2.19,"singleRate":44.6,"medalTotal":614},{"name":"中东区","total":6,"avg":2.17,"singleRate":33.3,"medalTotal":13},{"name":"客户体验与服务部","total":1149,"avg":2.15,"singleRate":33.4,"medalTotal":2473},{"name":"运营部","total":9967,"avg":2.12,"singleRate":37.1,"medalTotal":21139},{"name":"销售部","total":260,"avg":1.91,"singleRate":42.7,"medalTotal":497},{"name":"产品研发部","total":179,"avg":1.87,"singleRate":40.2,"medalTotal":335},{"name":"供应链规划及产品部","total":155,"avg":1.83,"singleRate":41.3,"medalTotal":284},{"name":"X科技部","total":28,"avg":1.82,"singleRate":60.7,"medalTotal":51},{"name":"亚太区","total":83,"avg":1.81,"singleRate":55.4,"medalTotal":150},{"name":"快递快运规划及产品部","total":15,"avg":1.73,"singleRate":40,"medalTotal":26},{"name":"无人机业务部","total":3,"avg":1.67,"singleRate":33.3,"medalTotal":5},{"name":"秒送物流事业部","total":147,"avg":1.63,"singleRate":56.5,"medalTotal":240},{"name":"运力平台部","total":168,"avg":1.57,"singleRate":54.2,"medalTotal":264},{"name":"战略与综合支持部","total":2,"avg":1.5,"singleRate":50,"medalTotal":3},{"name":"海外服务部","total":7,"avg":1.14,"singleRate":85.7,"medalTotal":8},{"name":"美洲区","total":5,"avg":1,"singleRate":100,"medalTotal":5}],"京东工业":[{"name":"工业品平台业务部","total":284,"avg":13.31,"singleRate":3.9,"medalTotal":3780},{"name":"自有品牌业务部","total":46,"avg":5.54,"singleRate":8.7,"medalTotal":255},{"name":"SMB业务部","total":50,"avg":5.04,"singleRate":10,"medalTotal":252},{"name":"MRO业务部","total":164,"avg":4.91,"singleRate":6.1,"medalTotal":805},{"name":"BOM业务部","total":82,"avg":4.61,"singleRate":6.1,"medalTotal":378},{"name":"国际商品供应链部","total":14,"avg":3.71,"singleRate":14.3,"medalTotal":52},{"name":"西北区","total":15,"avg":3.6,"singleRate":26.7,"medalTotal":54},{"name":"KA行业客户部","total":20,"avg":3.35,"singleRate":20,"medalTotal":67},{"name":"大客户部","total":29,"avg":3.17,"singleRate":24.1,"medalTotal":92},{"name":"华南区","total":31,"avg":2.97,"singleRate":35.5,"medalTotal":92},{"name":"技术产品部","total":85,"avg":2.48,"singleRate":41.2,"medalTotal":211},{"name":"华中区","total":19,"avg":2.32,"singleRate":47.4,"medalTotal":44},{"name":"综合服务与业务发展部","total":34,"avg":2.21,"singleRate":23.5,"medalTotal":75},{"name":"北方区","total":37,"avg":2.03,"singleRate":40.5,"medalTotal":75},{"name":"华东区","total":25,"avg":2,"singleRate":40,"medalTotal":50},{"name":"供应链规划与运营部","total":27,"avg":1.93,"singleRate":29.6,"medalTotal":52},{"name":"西南区","total":19,"avg":1.89,"singleRate":42.1,"medalTotal":36},{"name":"欧洲区","total":4,"avg":1.75,"singleRate":50,"medalTotal":7},{"name":"亚太区","total":7,"avg":1.43,"singleRate":71.4,"medalTotal":10},{"name":"美洲区","total":2,"avg":1,"singleRate":100,"medalTotal":2},{"name":"中东区","total":1,"avg":1,"singleRate":100,"medalTotal":1}],"CCO体系":[{"name":"党委办公室","total":1,"avg":16,"singleRate":0,"medalTotal":16},{"name":"集团政企业务部","total":1287,"avg":4.08,"singleRate":40.7,"medalTotal":5248},{"name":"审计部","total":40,"avg":2.48,"singleRate":20,"medalTotal":99},{"name":"法律合规部","total":28,"avg":2.29,"singleRate":35.7,"medalTotal":64},{"name":"京东经济发展研究院","total":1,"avg":2,"singleRate":0,"medalTotal":2},{"name":"物流内控合规部","total":180,"avg":1.79,"singleRate":43.9,"medalTotal":323},{"name":"知识产权保护部","total":14,"avg":1.71,"singleRate":71.4,"medalTotal":24},{"name":"监察部","total":9,"avg":1.67,"singleRate":55.6,"medalTotal":15},{"name":"信息安全部","total":44,"avg":1.66,"singleRate":56.8,"medalTotal":73},{"name":"商业合规部","total":8,"avg":1.62,"singleRate":62.5,"medalTotal":13},{"name":"公共关系部","total":2,"avg":1.5,"singleRate":50,"medalTotal":3},{"name":"厂直防损部","total":7,"avg":1.43,"singleRate":57.1,"medalTotal":10},{"name":"地方业务发展部","total":3,"avg":1,"singleRate":100,"medalTotal":3},{"name":"中央部委事务部","total":2,"avg":1,"singleRate":100,"medalTotal":2},{"name":"司法行业服务部","total":3,"avg":1,"singleRate":100,"medalTotal":3}],"京东健康":[{"name":"医疗器械业务部","total":92,"avg":12.42,"singleRate":0,"medalTotal":1143},{"name":"消费器械业务部","total":98,"avg":12.11,"singleRate":2,"medalTotal":1187},{"name":"营养保健业务部","total":251,"avg":11.82,"singleRate":2.4,"medalTotal":2967},{"name":"医药业务部","total":265,"avg":10.71,"singleRate":9.4,"medalTotal":2837},{"name":"用户与商家体验部","total":63,"avg":7.21,"singleRate":4.8,"medalTotal":454},{"name":"企业业务部","total":23,"avg":4.26,"singleRate":39.1,"medalTotal":98},{"name":"即时零售业务部","total":373,"avg":3.45,"singleRate":39.4,"medalTotal":1287},{"name":"到家服务业务部","total":23,"avg":3.09,"singleRate":34.8,"medalTotal":71},{"name":"互联网医疗业务部","total":28,"avg":2.75,"singleRate":46.4,"medalTotal":77},{"name":"市场营销部","total":23,"avg":2.57,"singleRate":39.1,"medalTotal":59},{"name":"公共事务与合规部","total":117,"avg":2.44,"singleRate":34.2,"medalTotal":285},{"name":"技术产品部","total":59,"avg":2.41,"singleRate":37.3,"medalTotal":142},{"name":"消费医疗业务部","total":58,"avg":2.19,"singleRate":37.9,"medalTotal":127},{"name":"智慧医疗业务部","total":4,"avg":1.5,"singleRate":50,"medalTotal":6},{"name":"战略与综合支持部","total":2,"avg":1,"singleRate":100,"medalTotal":2}],"CFO体系":[{"name":"应付共享中心","total":57,"avg":2.82,"singleRate":19.3,"medalTotal":161},{"name":"健康财务部","total":11,"avg":2.36,"singleRate":45.5,"medalTotal":26},{"name":"预算与分析部","total":4,"avg":2,"singleRate":25,"medalTotal":8},{"name":"战略投资部","total":2,"avg":2,"singleRate":0,"medalTotal":4},{"name":"工业财务部","total":3,"avg":2,"singleRate":33.3,"medalTotal":6},{"name":"零售财务部","total":154,"avg":1.99,"singleRate":44.2,"medalTotal":307},{"name":"财务部","total":23,"avg":1.91,"singleRate":43.5,"medalTotal":44},{"name":"资金部","total":8,"avg":1.75,"singleRate":62.5,"medalTotal":14},{"name":"物流财务部","total":31,"avg":1.65,"singleRate":51.6,"medalTotal":51},{"name":"集采中心","total":36,"avg":1.58,"singleRate":61.1,"medalTotal":57},{"name":"国际业务财务部","total":12,"avg":1.42,"singleRate":66.7,"medalTotal":17},{"name":"税务服务部","total":15,"avg":1.4,"singleRate":60,"medalTotal":21},{"name":"科技财务部","total":4,"avg":1.25,"singleRate":75,"medalTotal":5},{"name":"产发财务部","total":1,"avg":1,"singleRate":100,"medalTotal":1},{"name":"公司金融部","total":1,"avg":1,"singleRate":100,"medalTotal":1}],"战略部":[{"name":"NULL","total":2,"avg":3.5,"singleRate":0,"medalTotal":7}],"京东科技":[{"name":"变色龙业务部","total":13,"avg":4.08,"singleRate":23.1,"medalTotal":53},{"name":"金刚项目组","total":4,"avg":2.5,"singleRate":50,"medalTotal":10},{"name":"市场与平台运营中心","total":38,"avg":2.32,"singleRate":55.3,"medalTotal":88},{"name":"金融科技事业群","total":129,"avg":2.22,"singleRate":47.3,"medalTotal":286},{"name":"客户体验与服务部","total":30,"avg":2,"singleRate":40,"medalTotal":60},{"name":"协同办公业务部","total":5,"avg":2,"singleRate":40,"medalTotal":10},{"name":"海外金融创新业务部","total":4,"avg":2,"singleRate":50,"medalTotal":8},{"name":"战略与综合支持部","total":5,"avg":1.8,"singleRate":40,"medalTotal":9},{"name":"保险业务部","total":266,"avg":1.75,"singleRate":63.5,"medalTotal":465},{"name":"风险管理中心","total":27,"avg":1.7,"singleRate":59.3,"medalTotal":46},{"name":"京东云事业部","total":101,"avg":1.63,"singleRate":60.4,"medalTotal":165},{"name":"智能风险资管业务部","total":105,"avg":1.54,"singleRate":59,"medalTotal":162},{"name":"人工智能业务部","total":7,"avg":1.29,"singleRate":85.7,"medalTotal":9}],"CHO体系":[{"name":"健康人力资源部","total":1,"avg":6,"singleRate":0,"medalTotal":6},{"name":"工业人力资源部","total":2,"avg":4,"singleRate":0,"medalTotal":8},{"name":"零售人力资源部","total":30,"avg":2.9,"singleRate":40,"medalTotal":87},{"name":"成长中心","total":7,"avg":2.57,"singleRate":71.4,"medalTotal":18},{"name":"组织部","total":1,"avg":2,"singleRate":0,"medalTotal":2},{"name":"行政服务中心","total":19,"avg":1.95,"singleRate":36.8,"medalTotal":37},{"name":"企业信息化部","total":44,"avg":1.84,"singleRate":47.7,"medalTotal":81},{"name":"物流人力资源部","total":61,"avg":1.57,"singleRate":55.7,"medalTotal":96},{"name":"科技人力资源部","total":2,"avg":1.5,"singleRate":50,"medalTotal":3},{"name":"国际人力资源部","total":5,"avg":1.4,"singleRate":60,"medalTotal":7},{"name":"人才引进部","total":3,"avg":1.33,"singleRate":66.7,"medalTotal":4},{"name":"共享服务中心","total":18,"avg":1.11,"singleRate":88.9,"medalTotal":20},{"name":"职能BP组","total":1,"avg":1,"singleRate":100,"medalTotal":1},{"name":"校企合作部","total":2,"avg":1,"singleRate":100,"medalTotal":2},{"name":"组织发展中心","total":6,"avg":1,"singleRate":100,"medalTotal":6},{"name":"产发人力资源部","total":1,"avg":1,"singleRate":100,"medalTotal":1}],"京东产发":[{"name":"西区","total":1,"avg":2,"singleRate":0,"medalTotal":2},{"name":"华南区","total":3,"avg":2,"singleRate":33.3,"medalTotal":6},{"name":"华东二区","total":1,"avg":2,"singleRate":0,"medalTotal":2},{"name":"华北区","total":6,"avg":1.83,"singleRate":50,"medalTotal":11},{"name":"资产运营部","total":4,"avg":1.75,"singleRate":50,"medalTotal":7},{"name":"物流招商部","total":3,"avg":1.67,"singleRate":33.3,"medalTotal":5},{"name":"投资部","total":3,"avg":1.67,"singleRate":33.3,"medalTotal":5},{"name":"华中区","total":4,"avg":1.5,"singleRate":75,"medalTotal":6},{"name":"华东一区","total":6,"avg":1.5,"singleRate":66.7,"medalTotal":9},{"name":"运营与保障部","total":2,"avg":1.5,"singleRate":50,"medalTotal":3},{"name":"北区","total":7,"avg":1.29,"singleRate":85.7,"medalTotal":9},{"name":"中东区","total":1,"avg":1,"singleRate":100,"medalTotal":1},{"name":"工程部","total":2,"avg":1,"singleRate":100,"medalTotal":2}],"国际事业群":[{"name":"全球售业务部","total":10,"avg":6,"singleRate":10,"medalTotal":60},{"name":"跨境业务三部","total":11,"avg":5,"singleRate":18.2,"medalTotal":55},{"name":"荷比卢业务部","total":3,"avg":3.67,"singleRate":0,"medalTotal":11},{"name":"自有品牌部","total":5,"avg":3.2,"singleRate":20,"medalTotal":16},{"name":"品牌出海部","total":1,"avg":3,"singleRate":0,"medalTotal":3},{"name":"跨境业务二部","total":11,"avg":2.82,"singleRate":36.4,"medalTotal":31},{"name":"跨境业务一部","total":13,"avg":2.77,"singleRate":53.8,"medalTotal":36},{"name":"德国业务部","total":4,"avg":2.5,"singleRate":25,"medalTotal":10},{"name":"综合支持部","total":9,"avg":2.22,"singleRate":22.2,"medalTotal":20},{"name":"客户服务部","total":2,"avg":2,"singleRate":50,"medalTotal":4},{"name":"平台营销中心","total":2,"avg":1.5,"singleRate":50,"medalTotal":3},{"name":"英国业务部","total":4,"avg":1.5,"singleRate":50,"medalTotal":6},{"name":"国际合规部","total":1,"avg":1,"singleRate":100,"medalTotal":1}],"综合部":[{"name":"管培生部","total":4,"avg":3.5,"singleRate":25,"medalTotal":14}],"总裁办公室":[{"name":"NULL","total":5,"avg":4,"singleRate":0,"medalTotal":20},{"name":"京东美术馆","total":3,"avg":2.67,"singleRate":33.3,"medalTotal":8},{"name":"行政司机组","total":1,"avg":2,"singleRate":0,"medalTotal":2},{"name":"重大项目办公室","total":10,"avg":1.2,"singleRate":80,"medalTotal":12},{"name":"综合组","total":1,"avg":1,"singleRate":100,"medalTotal":1},{"name":"秘书组","total":2,"avg":1,"singleRate":100,"medalTotal":2}],"探索研究院":[{"name":"大数据工程部","total":2,"avg":1.5,"singleRate":50,"medalTotal":3},{"name":"自然语言实验室","total":1,"avg":1,"singleRate":100,"medalTotal":1},{"name":"空间与具身智能实验室","total":2,"avg":1,"singleRate":100,"medalTotal":2},{"name":"女娲实验室","total":1,"avg":1,"singleRate":100,"medalTotal":1},{"name":"语音与声学实验室","total":1,"avg":1,"singleRate":100,"medalTotal":1}]},"medalDeptDist":[{"name":"66大顺","code":"GreatSuccess","total":42551,"dist":[{"dept":"京东零售","count":24555},{"dept":"京东物流","count":12491},{"dept":"CCO体系","count":1621},{"dept":"京东健康","count":1463},{"dept":"京东工业","count":987},{"dept":"京东科技","count":721},{"dept":"CFO体系","count":360},{"dept":"CHO体系","count":203},{"dept":"国际事业群","count":73},{"dept":"京东产发","count":42},{"dept":"总裁办公室","count":22},{"dept":"探索研究院","count":7},{"dept":"综合部","count":4},{"dept":"战略部","count":2}]},{"name":"时间合伙人","code":"TimePartner","total":23126,"dist":[{"dept":"京东零售","count":13661},{"dept":"京东物流","count":6852},{"dept":"京东健康","count":747},{"dept":"CCO体系","count":733},{"dept":"京东工业","count":609},{"dept":"京东科技","count":236},{"dept":"CFO体系","count":160},{"dept":"CHO体系","count":75},{"dept":"国际事业群","count":27},{"dept":"京东产发","count":16},{"dept":"总裁办公室","count":8},{"dept":"战略部","count":2}]},{"name":"端午安康","code":"DragonBoatFestivalWellBeing","total":19486,"dist":[{"dept":"京东零售","count":13666},{"dept":"京东物流","count":3551},{"dept":"京东健康","count":874},{"dept":"京东工业","count":637},{"dept":"CCO体系","count":488},{"dept":"京东科技","count":137},{"dept":"CFO体系","count":71},{"dept":"CHO体系","count":32},{"dept":"国际事业群","count":23},{"dept":"京东产发","count":5},{"dept":"探索研究院","count":1},{"dept":"总裁办公室","count":1}]},{"name":"奋斗足迹","code":"FootprintsOfStruggle","total":15349,"dist":[{"dept":"京东零售","count":11503},{"dept":"京东物流","count":2132},{"dept":"京东健康","count":755},{"dept":"京东工业","count":524},{"dept":"CCO体系","count":336},{"dept":"CFO体系","count":37},{"dept":"京东科技","count":36},{"dept":"国际事业群","count":12},{"dept":"CHO体系","count":8},{"dept":"京东产发","count":4},{"dept":"总裁办公室","count":2}]},{"name":"新春贺岁","code":"HappyNewYear","total":13557,"dist":[{"dept":"京东零售","count":11372},{"dept":"京东健康","count":691},{"dept":"京东物流","count":628},{"dept":"CCO体系","count":360},{"dept":"京东工业","count":346},{"dept":"京东科技","count":60},{"dept":"CFO体系","count":55},{"dept":"国际事业群","count":22},{"dept":"CHO体系","count":19},{"dept":"综合部","count":2},{"dept":"总裁办公室","count":2}]},{"name":"持之以恒","code":"PerfectAttendance","total":12950,"dist":[{"dept":"京东零售","count":11494},{"dept":"京东健康","count":726},{"dept":"京东工业","count":339},{"dept":"CCO体系","count":303},{"dept":"京东科技","count":30},{"dept":"京东物流","count":25},{"dept":"国际事业群","count":17},{"dept":"CHO体系","count":5},{"dept":"CFO体系","count":4},{"dept":"综合部","count":3},{"dept":"总裁办公室","count":3},{"dept":"战略部","count":1}]},{"name":"全域探索","code":"GlobalExploration","total":11554,"dist":[{"dept":"京东零售","count":10197},{"dept":"京东健康","count":662},{"dept":"京东工业","count":330},{"dept":"CCO体系","count":292},{"dept":"京东物流","count":23},{"dept":"京东科技","count":23},{"dept":"国际事业群","count":12},{"dept":"CHO体系","count":7},{"dept":"CFO体系","count":5},{"dept":"综合部","count":2},{"dept":"总裁办公室","count":1}]},{"name":"日积月累","code":"PioneerOfLanding","total":10472,"dist":[{"dept":"京东零售","count":9356},{"dept":"京东健康","count":559},{"dept":"京东工业","count":266},{"dept":"CCO体系","count":239},{"dept":"京东科技","count":17},{"dept":"京东物流","count":14},{"dept":"国际事业群","count":10},{"dept":"CHO体系","count":5},{"dept":"CFO体系","count":3},{"dept":"总裁办公室","count":2},{"dept":"战略部","count":1}]},{"name":"灯映前程","code":"LightIlluminatingTheFuture","total":8238,"dist":[{"dept":"京东零售","count":7219},{"dept":"京东健康","count":447},{"dept":"京东工业","count":252},{"dept":"CCO体系","count":201},{"dept":"京东物流","count":66},{"dept":"京东科技","count":22},{"dept":"CFO体系","count":14},{"dept":"国际事业群","count":13},{"dept":"CHO体系","count":4}]},{"name":"战斗印记","code":"DoubleElevenPromotion","total":8064,"dist":[{"dept":"京东零售","count":7205},{"dept":"京东健康","count":383},{"dept":"京东工业","count":220},{"dept":"CCO体系","count":185},{"dept":"京东科技","count":28},{"dept":"京东物流","count":20},{"dept":"国际事业群","count":10},{"dept":"CHO体系","count":6},{"dept":"CFO体系","count":4},{"dept":"总裁办公室","count":2},{"dept":"京东产发","count":1}]},{"name":"年度同行者","code":"AnnualCompanion","total":7589,"dist":[{"dept":"京东零售","count":6778},{"dept":"京东健康","count":362},{"dept":"京东工业","count":213},{"dept":"CCO体系","count":187},{"dept":"京东物流","count":15},{"dept":"京东科技","count":12},{"dept":"国际事业群","count":11},{"dept":"CFO体系","count":7},{"dept":"CHO体系","count":3},{"dept":"综合部","count":1}]},{"name":"智搜达人","code":"SmartSearchExpert","total":6605,"dist":[{"dept":"京东零售","count":5828},{"dept":"京东健康","count":393},{"dept":"京东工业","count":230},{"dept":"CCO体系","count":135},{"dept":"京东物流","count":9},{"dept":"京东科技","count":6},{"dept":"国际事业群","count":4}]},{"name":"采销成长","code":"OswGrow","total":6571,"dist":[{"dept":"京东零售","count":5821},{"dept":"京东健康","count":352},{"dept":"京东工业","count":207},{"dept":"CCO体系","count":153},{"dept":"京东物流","count":14},{"dept":"京东科技","count":12},{"dept":"CHO体系","count":5},{"dept":"CFO体系","count":3},{"dept":"国际事业群","count":3},{"dept":"综合部","count":1}]},{"name":"智学先锋","code":"IntelligentLearningPioneer","total":5955,"dist":[{"dept":"京东零售","count":5918},{"dept":"京东健康","count":18},{"dept":"京东科技","count":5},{"dept":"国际事业群","count":4},{"dept":"CCO体系","count":4},{"dept":"京东工业","count":3},{"dept":"战略部","count":1},{"dept":"总裁办公室","count":1},{"dept":"京东物流","count":1}]},{"name":"智驭能手","code":"IntelligentDrivingExpert","total":5611,"dist":[{"dept":"京东零售","count":4769},{"dept":"京东健康","count":423},{"dept":"京东工业","count":237},{"dept":"CCO体系","count":168},{"dept":"京东物流","count":5},{"dept":"京东科技","count":4},{"dept":"国际事业群","count":4},{"dept":"综合部","count":1}]},{"name":"超级运营","code":"SupperConnector","total":5309,"dist":[{"dept":"京东零售","count":4756},{"dept":"京东健康","count":279},{"dept":"京东工业","count":206},{"dept":"CCO体系","count":50},{"dept":"京东科技","count":9},{"dept":"国际事业群","count":5},{"dept":"京东物流","count":4}]},{"name":"元气劳模","code":"StriveMakeSucceed","total":3641,"dist":[{"dept":"京东零售","count":3156},{"dept":"京东物流","count":336},{"dept":"京东健康","count":78},{"dept":"京东工业","count":34},{"dept":"CCO体系","count":31},{"dept":"国际事业群","count":3},{"dept":"京东科技","count":2},{"dept":"CHO体系","count":1}]},{"name":"智问行家","code":"SeekingExpertOpinions","total":3568,"dist":[{"dept":"京东零售","count":3145},{"dept":"京东健康","count":204},{"dept":"京东工业","count":127},{"dept":"CCO体系","count":77},{"dept":"京东物流","count":8},{"dept":"CHO体系","count":3},{"dept":"京东科技","count":3},{"dept":"国际事业群","count":1}]},{"name":"自动化达人","code":"OperationsEfficiencySpecialist","total":3343,"dist":[{"dept":"京东零售","count":2760},{"dept":"京东健康","count":276},{"dept":"京东工业","count":183},{"dept":"CCO体系","count":121},{"dept":"京东物流","count":3}]},{"name":"分析百事通","code":"AnalyzingBaiShiTong","total":3066,"dist":[{"dept":"京东零售","count":2673},{"dept":"京东健康","count":253},{"dept":"京东工业","count":109},{"dept":"CCO体系","count":28},{"dept":"京东物流","count":2},{"dept":"CHO体系","count":1}]}]};
+
+
+// Dept Cards
+const mainDepts = DEPT.deptSummary.filter(d => d.total >= 30);
+document.getElementById('deptCards').innerHTML = mainDepts.map(d => `
+  <div class="dept-card">
+    <div class="dept-name">${d.name}</div>
+    <div class="dept-avg">${d.avg}</div>
+    <div class="dept-meta">人均勋章 · ${fmt(d.total)}人 · 仅1枚${d.singleRate}%</div>
+  </div>
+`).join('');
+
+// Dept avg bar chart
+const deptChartDepts = DEPT.deptSummary.filter(d => d.total >= 30).sort((a,b) => b.avg - a.avg);
+new Chart(document.getElementById('chartDeptAvg'), {
+  type: 'bar',
+  data: {
+    labels: deptChartDepts.map(d => d.name),
+    datasets: [{
+      label: '人均勋章数',
+      data: deptChartDepts.map(d => d.avg),
+      backgroundColor: deptChartDepts.map(d => d.avg >= 5 ? 'rgba(79,195,247,0.7)' : d.avg >= 3 ? 'rgba(102,187,106,0.7)' : 'rgba(255,167,38,0.7)'),
+      borderRadius: 4
+    }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => `人均${ctx.raw}枚 · 中位数${deptChartDepts[ctx.dataIndex].median}枚` } }
+    },
+    scales: {
+      x: { grid: { color: '#1e3550' }, title: { display: true, text: '人均勋章数', color: '#7a9bb5' } },
+      y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+    }
+  }
+});
+
+// Dept single rate bar
+new Chart(document.getElementById('chartDeptSingleRate'), {
+  type: 'bar',
+  data: {
+    labels: deptChartDepts.map(d => d.name),
+    datasets: [{
+      label: '仅1枚用户占比',
+      data: deptChartDepts.map(d => d.singleRate),
+      backgroundColor: deptChartDepts.map(d => d.singleRate >= 40 ? 'rgba(239,83,80,0.7)' : d.singleRate >= 25 ? 'rgba(255,167,38,0.7)' : 'rgba(102,187,106,0.7)'),
+      borderRadius: 4
+    }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => `${ctx.raw}% 仅持1枚（${fmt(deptChartDepts[ctx.dataIndex].singleCount)}人）` } }
+    },
+    scales: {
+      x: { grid: { color: '#1e3550' }, title: { display: true, text: '仅1枚用户占比(%)', color: '#7a9bb5' }, max: 100 },
+      y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+    }
+  }
+});
+
+// Dept2 toggles and content
+const dept2Keys = Object.keys(DEPT.dept2Summary).sort();
+let activeDept2 = dept2Keys[0] || '';
+
+function renderDept2() {
+  const data = DEPT.dept2Summary[activeDept2] || [];
+  if (!data.length) { document.getElementById('dept2Content').innerHTML = '<div style="color:#5a7a95;text-align:center;padding:20px">暂无数据</div>'; return; }
+  const maxAvg = Math.max(...data.map(d => d.avg));
+  document.getElementById('dept2Content').innerHTML = `
+    <table style="width:100%">
+      <thead><tr>
+        <th style="text-align:left">二级部门</th>
+        <th style="text-align:right">人数</th>
+        <th style="text-align:right">人均勋章</th>
+        <th style="text-align:right">仅1枚占比</th>
+        <th>人均勋章可视化</th>
+      </tr></thead>
+      <tbody>${data.map(d => `
+        <tr>
+          <td class="medal-name">${d.name}</td>
+          <td class="count">${fmt(d.total)}</td>
+          <td class="count" style="color:${d.avg>=5?'#4fc3f7':d.avg>=3?'#66bb6a':'#ffa726'}">${d.avg}</td>
+          <td style="text-align:right;color:${d.singleRate>=40?'#ef5350':d.singleRate>=25?'#ffa726':'#66bb6a'};font-weight:600">${d.singleRate}%</td>
+          <td><div class="bar-bg" style="width:120px;display:inline-block"><div class="bar-fill" style="width:${d.avg/maxAvg*100}%;background:${d.avg>=5?'#4fc3f7':d.avg>=3?'#66bb6a':'#ffa726'}"></div></div></td>
+        </tr>
+      `).join('')}</tbody>
+    </table>
+  `;
+}
+
+document.getElementById('dept2Toggles').innerHTML = dept2Keys.map(k =>
+  `<button class="dept2-toggle${k===activeDept2?' active':''}" data-dept="${k}">${k}</button>`
+).join('');
+
+document.querySelectorAll('.dept2-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeDept2 = btn.dataset.dept;
+    document.querySelectorAll('.dept2-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderDept2();
+  });
+});
+renderDept2();
+
+// Medal dept stacked bar (top 20 medals)
+const top20Dept = DEPT.medalDeptDist;
+const allDeptsForStack = [...new Set(top20Dept.flatMap(m => m.dist.map(d => d.dept)))];
+const deptStackColors = {
+  '京东零售': 'rgba(79,195,247,0.8)', '京东物流': 'rgba(102,187,106,0.8)',
+  '已离职': 'rgba(239,83,80,0.6)', 'CCO体系': 'rgba(255,167,38,0.8)',
+  '京东健康': 'rgba(171,71,188,0.8)', '京东工业': 'rgba(38,198,218,0.8)',
+  '京东科技': 'rgba(255,183,77,0.8)', 'CFO体系': 'rgba(144,164,174,0.8)',
+  'CHO体系': 'rgba(240,98,146,0.8)', '国际事业群': 'rgba(129,199,132,0.8)',
+  '京东产发': 'rgba(149,117,205,0.8)', '总裁办公室': 'rgba(77,182,172,0.8)',
+  '探索研究院': 'rgba(255,138,101,0.8)', '综合部': 'rgba(189,189,189,0.8)',
+  '战略部': 'rgba(174,213,129,0.8)'
+};
+
+new Chart(document.getElementById('chartMedalDeptStack'), {
+  type: 'bar',
+  data: {
+    labels: top20Dept.map(m => m.name),
+    datasets: allDeptsForStack.map(dept => ({
+      label: dept,
+      data: top20Dept.map(m => { const found = m.dist.find(d => d.dept === dept); return found ? found.count : 0; }),
+      backgroundColor: deptStackColors[dept] || 'rgba(158,158,158,0.6)',
+      borderRadius: 2
+    }))
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom', labels: { usePointStyle: true, padding: 10, font: { size: 10 } } },
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)}人` } }
+    },
+    scales: {
+      x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+      y: { stacked: true, grid: { color: '#1e3550' }, title: { display: true, text: '获得人数', color: '#7a9bb5' } }
+    }
+  }
+});
+
+</script>
+</body>
+</html>
