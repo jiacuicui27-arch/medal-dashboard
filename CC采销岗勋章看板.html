@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勋章指标设定及数据分析</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #0f1923;
+    color: #e0e6ed;
+    min-height: 100vh;
+  }
+
+  /* ===== Header with Tabs ===== */
+  .header {
+    text-align: center;
+    padding: 24px 20px 0;
+    background: linear-gradient(135deg, #0f1923 0%, #1a2a3a 100%);
+    border-bottom: 2px solid #5a3a1a;
+  }
+  .header h1 {
+    font-size: 28px;
+    background: linear-gradient(90deg, #ffa726, #ffcc80, #ffe0b2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 4px;
+    margin-bottom: 6px;
+  }
+  .header .subtitle { color: #7a9bb5; font-size: 13px; margin-bottom: 14px; }
+
+  /* Tab Navigation */
+  .tab-nav {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+  }
+  .tab-btn {
+    padding: 10px 36px;
+    font-size: 15px;
+    font-weight: 600;
+    border: 1px solid #2a4a6a;
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    background: #0f1923;
+    color: #5a7a95;
+    cursor: pointer;
+    transition: all 0.25s;
+    letter-spacing: 1px;
+    position: relative;
+    top: 2px;
+  }
+  .tab-btn:hover { color: #ffa726; background: #162636; }
+  .tab-btn.active {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    color: #ffa726;
+    border-color: #5a3a1a;
+    border-bottom: 2px solid #1a3044;
+    top: 0;
+    z-index: 2;
+  }
+
+  .container { max-width: 1440px; margin: 0 auto; padding: 20px; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ===== KPI Cards ===== */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 12px;
+    padding: 18px 16px;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,167,38,0.15); }
+  .kpi-card .label { font-size: 12px; color: #7a9bb5; margin-bottom: 8px; letter-spacing: 1px; }
+  .kpi-card .value { font-size: 26px; font-weight: 700; }
+  .kpi-card .unit { font-size: 11px; color: #5a7a95; margin-top: 4px; }
+  .kpi-card.highlight .value { color: #ffa726; }
+  .kpi-card.success .value { color: #66bb6a; }
+  .kpi-card.warning .value { color: #ff7043; }
+  .kpi-card.info .value { color: #ab47bc; }
+  .kpi-card.rose .value { color: #f06292; }
+  .kpi-card.cyan .value { color: #26c6da; }
+  .kpi-card.gold .value { color: #ffd700; }
+
+  /* ===== Section ===== */
+  .section {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-left: 10px;
+    border-left: 3px solid #ffa726;
+    color: #b0d4f1;
+  }
+  .section-title.gold { border-left-color: #ffd700; }
+  .section-title.green { border-left-color: #66bb6a; }
+  .section-title.rose { border-left-color: #f06292; }
+  .section-title.purple { border-left-color: #ab47bc; }
+  .section-title.orange { border-left-color: #ffa726; }
+  .section-title.cyan { border-left-color: #26c6da; }
+
+  .chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .chart-row.full { grid-template-columns: 1fr; }
+  .chart-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+  .chart-container { position: relative; width: 100%; }
+
+  /* ===== Table ===== */
+  .medal-table-wrap { max-height: 600px; overflow-y: auto; border-radius: 8px; }
+  .medal-table-wrap::-webkit-scrollbar { width: 6px; }
+  .medal-table-wrap::-webkit-scrollbar-track { background: #1a2a3a; }
+  .medal-table-wrap::-webkit-scrollbar-thumb { background: #3a5a7a; border-radius: 3px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { position: sticky; top: 0; z-index: 2; }
+  th {
+    background: #1a3550;
+    color: #c4a35a;
+    padding: 10px 8px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #4a3a1a;
+    white-space: nowrap;
+  }
+  th.center { text-align: center; }
+  td { padding: 9px 8px; border-bottom: 1px solid #1e3550; white-space: nowrap; }
+  tr:hover td { background: rgba(255,167,38,0.06); }
+  .rank { color: #7a9bb5; font-weight: 600; text-align: center; }
+  .rank-top1 { color: #ffd700 !important; }
+  .rank-top2 { color: #c0c0c0 !important; }
+  .rank-top3 { color: #cd7f32 !important; }
+  .medal-name { color: #e0e6ed; font-weight: 500; }
+  .count { text-align: right; font-weight: 600; color: #b0d4f1; }
+  .pct { text-align: right; color: #7a9bb5; }
+  .bar-cell { width: 110px; }
+  .bar-bg { background: #1a2a3a; border-radius: 3px; height: 16px; position: relative; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .tier-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .tier-none { background: rgba(90,122,149,0.15); color: #5a7a95; }
+  .tier-hard { background: rgba(239,83,80,0.15); color: #ef5350; }
+  .tier-harder { background: rgba(255,112,67,0.15); color: #ff7043; }
+  .tier-moderate { background: rgba(255,167,38,0.15); color: #ffa726; }
+  .tier-easy { background: rgba(102,187,106,0.15); color: #66bb6a; }
+
+  /* ===== Badges ===== */
+  .type-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+  .purpose-huoyue { background: rgba(79,195,247,0.15); color: #4fc3f7; }
+  .purpose-gongneng { background: rgba(102,187,106,0.15); color: #66bb6a; }
+  .purpose-huodong { background: rgba(255,167,38,0.15); color: #ffa726; }
+  .purpose-jieri { background: rgba(240,98,146,0.15); color: #f06292; }
+  .purpose-xuexi { background: rgba(79,195,247,0.15); color: #4fc3f7; }
+  .purpose-shengtai { background: rgba(255,167,38,0.15); color: #ffa726; }
+  .purpose-changjing { background: rgba(240,98,146,0.15); color: #f06292; }
+  .purpose-yewu { background: rgba(171,71,188,0.15); color: #ab47bc; }
+  .mt-jiyu { background: rgba(255,215,0,0.12); color: #ffd700; }
+  .mt-rongyu { background: rgba(79,195,247,0.15); color: #4fc3f7; }
+  .mt-chengzhang { background: rgba(102,187,106,0.15); color: #66bb6a; }
+  .mt-xianding { background: rgba(171,71,188,0.15); color: #ab47bc; }
+  .mt-xinren { background: rgba(38,198,218,0.15); color: #26c6da; }
+  .attr-upgrade { background: rgba(171,71,188,0.15); color: #ab47bc; }
+  .attr-fixed { background: rgba(78,182,154,0.15); color: #4eb69a; }
+
+  /* ===== Percentile ===== */
+  .percentile-bar { margin: 12px 0; }
+  .percentile-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; }
+  .percentile-label { width: 110px; color: #7a9bb5; flex-shrink: 0; }
+  .percentile-track { flex: 1; height: 8px; background: #1a2a3a; border-radius: 4px; margin: 0 12px; position: relative; }
+  .percentile-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #ffa726, #ffcc80); }
+  .percentile-value { width: 36px; text-align: right; color: #ffa726; font-weight: 600; flex-shrink: 0; }
+
+  /* ===== Insights ===== */
+  .insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .insight-box {
+    background: rgba(255,167,38,0.06);
+    border: 1px solid rgba(255,167,38,0.15);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .insight-box .insight-title { font-size: 13px; color: #ffa726; margin-bottom: 8px; font-weight: 600; }
+  .insight-box .insight-text { font-size: 13px; color: #b0d4f1; line-height: 1.7; }
+  .insight-box .hl { color: #ffa726; font-weight: 700; }
+
+  /* ===== Recommendations ===== */
+  .rec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 14px;
+  }
+  .rec-card {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 12px;
+    padding: 18px;
+    transition: transform 0.2s;
+  }
+  .rec-card:hover { transform: translateY(-2px); }
+  .rec-card .rec-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .rec-card .rec-icon { font-size: 20px; }
+  .rec-card .rec-title { font-size: 14px; font-weight: 600; color: #b0d4f1; }
+  .rec-card .rec-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; margin-left: auto; }
+  .tag-urgent { background: rgba(239,83,80,0.15); color: #ef5350; }
+  .tag-important { background: rgba(255,167,38,0.15); color: #ffa726; }
+  .tag-suggest { background: rgba(79,195,247,0.15); color: #4fc3f7; }
+  .tag-strategic { background: rgba(171,71,188,0.15); color: #ab47bc; }
+  .rec-card .rec-body { font-size: 13px; color: #8aabb5; line-height: 1.8; }
+  .rec-card .rec-body strong { color: #b0d4f1; }
+  .rec-card .rec-body .m { color: #ffa726; font-weight: 700; }
+  .rec-card .rec-action { margin-top: 10px; padding-top: 10px; border-top: 1px solid #1e3550; font-size: 12px; color: #ffa726; line-height: 1.7; }
+  .rec-card .rec-action::before { content: '\279C  '; }
+
+  /* ===== Sort/filter buttons ===== */
+  .sort-btns { margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .sort-btn {
+    padding: 5px 14px;
+    border-radius: 16px;
+    border: 1px solid #2a4a6a;
+    background: transparent;
+    color: #7a9bb5;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sort-btn:hover, .sort-btn.active { background: rgba(255,167,38,0.15); border-color: #ffa726; color: #ffa726; }
+  .filter-label { color: #7a9bb5; font-size: 12px; margin-right: 4px; }
+
+  /* ===== Dim stat cards ===== */
+  .dim-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .dim-stat {
+    background: rgba(255,167,38,0.06);
+    border: 1px solid rgba(255,167,38,0.12);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .dim-stat .dim-label { font-size: 12px; color: #7a9bb5; margin-bottom: 4px; }
+  .dim-stat .dim-value { font-size: 22px; font-weight: 700; color: #ffa726; }
+  .dim-stat .dim-sub { font-size: 11px; color: #5a7a95; margin-top: 2px; }
+
+  /* ===== Distribution highlight card ===== */
+  .dist-highlight {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .dist-card {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .dist-card .dist-label { font-size: 12px; color: #7a9bb5; margin-bottom: 6px; }
+  .dist-card .dist-value { font-size: 20px; font-weight: 700; }
+  .dist-card .dist-sub { font-size: 11px; color: #5a7a95; margin-top: 4px; }
+
+  /* ===== Department section ===== */
+  .dept-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .dept-card {
+    background: linear-gradient(145deg, #162636, #1a3044);
+    border: 1px solid #2a4a6a;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    transition: transform 0.2s;
+  }
+  .dept-card:hover { transform: translateY(-2px); }
+  .dept-card .dept-name { font-size: 14px; font-weight: 600; color: #b0d4f1; margin-bottom: 6px; }
+  .dept-card .dept-avg { font-size: 24px; font-weight: 700; color: #ffa726; }
+  .dept-card .dept-meta { font-size: 11px; color: #5a7a95; margin-top: 4px; }
+  .role-card { border-color: rgba(171,71,188,0.3); }
+  .role-card .dept-avg { color: #ab47bc; }
+
+  @media (max-width: 900px) {
+    .chart-row, .chart-row.triple { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 768px) {
+    #medalCondGrid [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+  }
+
+  /* ======================================================= */
+  /* ===== 指标设定工具 Dark Theme Styles ===== */
+  /* ======================================================= */
+
+  .tool-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  .tool-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: start; }
+  @media(max-width:900px) { .tool-grid-2, .tool-grid-3 { grid-template-columns: 1fr; } }
+
+  /* Tool table */
+  .tool-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; border-radius: 8px; overflow: hidden; }
+  .tool-table th {
+    background: #1a3550;
+    color: #c4a35a;
+    font-weight: 500;
+    text-align: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid #2a4a6a;
+    font-size: 13px;
+  }
+  .tool-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #1e3550;
+    text-align: center;
+    color: #b0d4f1;
+  }
+  .tool-table tr:last-child td { border-bottom: none; }
+  .tool-table tr:hover td { background: rgba(255,167,38,0.06); }
+
+  /* Tool inputs */
+  .tool-input, .tool-select, .tool-textarea {
+    padding: 8px 12px;
+    border: 1px solid #2a4a6a;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
+    background: #0f1923;
+    color: #e0e6ed;
+  }
+  .tool-input:focus, .tool-select:focus, .tool-textarea:focus {
+    border-color: #ffa726;
+    box-shadow: 0 0 0 3px rgba(255,167,38,0.12);
+  }
+  .tool-input::placeholder, .tool-textarea::placeholder { color: #5a7a95; }
+  .tool-input[type="number"] { text-align: center; }
+
+  /* Tool buttons */
+  .tool-btn {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+  .tool-btn:active { transform: scale(0.97); }
+  .tool-btn-primary { background: #ffa726; color: #0f1923; font-weight: 600; }
+  .tool-btn-primary:hover { background: #ffb74d; box-shadow: 0 2px 8px rgba(255,167,38,0.3); }
+  .tool-btn-success { background: #66bb6a; color: #0f1923; }
+  .tool-btn-success:hover { background: #81c784; }
+  .tool-btn-warning { background: #ff7043; color: #0f1923; }
+  .tool-btn-danger { background: transparent; color: #ef5350; border: 1px solid #ef5350; }
+  .tool-btn-danger:hover { background: rgba(239,83,80,0.12); }
+  .tool-btn-ghost { background: transparent; color: #ffa726; border: 1px solid #ffa726; }
+  .tool-btn-ghost:hover { background: rgba(255,167,38,0.12); }
+  .tool-btn-sm { padding: 5px 12px; font-size: 12px; }
+  .tool-btn-lg { font-size: 16px; padding: 14px 48px; border-radius: 12px; font-weight: 600; }
+  .tool-btn-group { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .tool-btn-center { text-align: center; margin: 32px 0; }
+
+  /* Tool badges */
+  .tool-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .badge-bronze { background: linear-gradient(135deg, rgba(205,127,50,0.2), rgba(184,115,51,0.2)); color: #cd7f32; border: 1px solid rgba(205,127,50,0.4); }
+  .badge-silver { background: linear-gradient(135deg, rgba(192,192,192,0.2), rgba(168,168,168,0.2)); color: #c0c0c0; border: 1px solid rgba(192,192,192,0.4); }
+  .badge-gold { background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,179,0,0.2)); color: #ffd700; border: 1px solid rgba(255,215,0,0.4); }
+
+  /* Tool stat box */
+  .tool-stat-box {
+    text-align: center;
+    padding: 20px 16px;
+    border-radius: 12px;
+    border: 1px solid #2a4a6a;
+    background: linear-gradient(145deg, #162636, #1a3044);
+    transition: all 0.2s;
+  }
+  .tool-stat-box:hover { border-color: #ffa726; }
+  .tool-stat-box .val { font-size: 26px; font-weight: 700; color: #ffa726; }
+  .tool-stat-box .label { font-size: 12px; color: #5a7a95; margin-top: 4px; }
+
+  /* Tool progress bar */
+  .tool-progress-bar { background: #1a2a3a; border-radius: 10px; height: 24px; overflow: hidden; position: relative; }
+  .tool-progress-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.6s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    font-size: 11px;
+    color: #fff;
+    font-weight: 600;
+    min-width: 44px;
+  }
+
+  /* Tool tip */
+  .tool-tip {
+    background: rgba(255,167,38,0.06);
+    border: 1px solid rgba(255,167,38,0.15);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #b0d4f1;
+    margin-bottom: 16px;
+    line-height: 1.7;
+  }
+  .tool-tip::before { content: "💡 "; }
+
+  /* Tool recommend tag */
+  .tool-recommend-tag {
+    display: inline-block;
+    background: #66bb6a;
+    color: #0f1923;
+    font-size: 10px;
+    padding: 1px 8px;
+    border-radius: 8px;
+    margin-left: 4px;
+    font-weight: 600;
+  }
+
+  /* Tool form field */
+  .tool-form-field { margin-bottom: 20px; }
+  .tool-form-field label {
+    font-size: 14px;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 8px;
+    color: #e0e6ed;
+  }
+  .tool-form-field label .required { color: #ef5350; }
+  .tool-form-row { display: flex; gap: 8px; align-items: center; }
+  .tool-form-row .unit { font-size: 13px; color: #5a7a95; white-space: nowrap; }
+  .tool-help-text { font-size: 12px; color: #5a7a95; margin-top: 5px; }
+
+  /* Tool scenario */
+  .tool-scenario-section { border-left: 4px solid #ffa726; }
+  .tool-scenario-input {
+    width: 100%;
+    min-height: 76px;
+    padding: 14px;
+    border: 1px solid #2a4a6a;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+    transition: all 0.2s;
+    font-family: inherit;
+    background: #0f1923;
+    color: #e0e6ed;
+  }
+  .tool-scenario-input:focus { border-color: #ffa726; box-shadow: 0 0 0 3px rgba(255,167,38,0.12); }
+  .tool-preset-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .tool-preset-tag {
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #2a4a6a;
+    background: #162636;
+    color: #7a9bb5;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .tool-preset-tag:hover { border-color: #ffa726; color: #ffa726; background: rgba(255,167,38,0.08); transform: translateY(-1px); }
+  .tool-preset-tag.selected { border-color: #ffa726; color: #ffa726; background: rgba(255,167,38,0.12); }
+  .tool-recommend-result {
+    display: none;
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(255,167,38,0.08) 0%, rgba(255,167,38,0.03) 100%);
+    border: 1px solid rgba(255,167,38,0.2);
+  }
+  .tool-recommend-result.show { display: block; }
+  .tool-recommend-dim { font-size: 20px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; color: #ffa726; }
+  .tool-recommend-reason { margin-top: 10px; font-size: 13px; color: #8aabb5; line-height: 1.8; }
+  .tool-recommend-reason li { margin-bottom: 4px; }
+  .tool-confidence { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #5a7a95; margin-top: 8px; }
+  .tool-confidence-bar { width: 64px; height: 6px; background: #1a2a3a; border-radius: 3px; overflow: hidden; }
+  .tool-confidence-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .tool-dim-options { display: flex; gap: 12px; margin-top: 14px; }
+  .tool-dim-option {
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    border: 2px solid #2a4a6a;
+    background: #162636;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .tool-dim-option:hover { border-color: #ffa726; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(255,167,38,0.12); }
+  .tool-dim-option.active { border-color: #ffa726; background: rgba(255,167,38,0.12); color: #ffa726; font-weight: 600; }
+  .tool-dim-option .dim-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+  .tool-dim-option .dim-text { font-size: 13px; color: #b0d4f1; }
+  .tool-dim-option .rec-badge {
+    display: inline-block;
+    font-size: 10px;
+    background: #66bb6a;
+    color: #0f1923;
+    padding: 1px 7px;
+    border-radius: 8px;
+    margin-left: 2px;
+    vertical-align: middle;
+    font-weight: 600;
+  }
+  .tool-scenario-set-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    background: rgba(255,167,38,0.12);
+    color: #ffa726;
+    border-radius: 12px;
+    font-size: 11px;
+    margin-left: 8px;
+    font-weight: 500;
+  }
+
+  /* Tool result card */
+  .tool-result-card {
+    background: linear-gradient(135deg, #ffa726 0%, #ff7043 100%);
+    color: #0f1923;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(255,167,38,0.2);
+  }
+  .tool-result-card h3 { font-size: 15px; opacity: 0.85; margin-bottom: 10px; color: #0f1923; }
+  .tool-result-card .badge-card {
+    background: rgba(15,25,35,0.15);
+    border-radius: 8px;
+    padding: 14px 18px;
+    min-width: 130px;
+    border: 1px solid rgba(15,25,35,0.2);
+  }
+  .tool-result-card .badge-card .badge-label { font-size: 12px; opacity: 0.85; color: #e0e6ed; }
+  .tool-result-card .badge-card .badge-threshold { font-size: 24px; font-weight: 700; margin: 4px 0; color: #ffa726; }
+  .tool-result-card .badge-card .badge-pct { font-size: 12px; opacity: 0.85; color: #b0d4f1; }
+
+  /* Tool scheme desc */
+  .tool-scheme-desc {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: rgba(15,25,35,0.5);
+    border-radius: 8px;
+    border-left: 3px solid #2a4a6a;
+  }
+  .tool-scheme-desc.rec { border-left-color: #ffa726; background: rgba(255,167,38,0.06); }
+
+  /* Tool quick summary */
+  .tool-quick-summary {
+    background: rgba(15,25,35,0.5);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 12px;
+    border: 1px solid #1e3550;
+  }
+  .tool-quick-summary-title { font-size: 13px; color: #7a9bb5; margin-bottom: 6px; font-weight: 600; }
+  .tool-quick-summary-content { font-size: 13px; color: #5a7a95; }
+  .tool-quick-summary-content strong { color: #ffa726; font-weight: 600; }
+
+  /* Tool result placeholder */
+  .tool-result-placeholder {
+    text-align: center;
+    padding: 60px 20px;
+    color: #5a7a95;
+  }
+  .tool-result-placeholder .placeholder-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+  .tool-result-placeholder .placeholder-text { font-size: 15px; }
+
+  /* Tool compare table */
+  .tool-compare-table td.tool-recommended { background: rgba(255,167,38,0.06); position: relative; }
+  .tool-compare-table td.tool-recommended::after {
+    content: "✓ 推荐";
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 10px;
+    color: #66bb6a;
+    font-weight: 600;
+  }
+
+  /* Tool section icon */
+  .tool-section-icon {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px;
+    font-size: 17px;
+  }
+
+  /* Tool data header */
+  .tool-data-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .tool-data-header-title { font-size: 15px; font-weight: 600; color: #e0e6ed; }
+  .tool-data-header-right { display: flex; gap: 8px; align-items: center; }
+  .tool-data-header-right label { font-size: 13px; color: #7a9bb5; }
+
+  /* Fade in animation */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .fade-in { animation: fadeIn 0.25s ease; }
+</style>
+</head>
+<body>
+
+<!-- ===== Header with Tabs ===== -->
+<div class="header">
+  <h1>🎖️ 勋章指标设定及数据分析</h1>
+  <div class="subtitle">数据更新于 2026年07月 · 仅统计在职采销岗员工</div>
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('tool')">🏅 指标设定工具</button>
+    <button class="tab-btn" onclick="switchTab('dashboard')">📊 勋章体系数据分析</button>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- ===== Tab 1: 指标设定工具 ===== -->
+<!-- ============================================== -->
+<div id="toolContent" class="container tab-content active">
+
+  <!-- 场景智能推荐 -->
+  <div class="section tool-scenario-section">
+    <div class="section-title"><span class="tool-section-icon" style="background:rgba(255,167,38,0.12)">🔍</span> 功能使用场景</div>
+    <div class="tool-tip">描述你的功能使用场景，系统将智能推荐使用「天数」还是「次数」作为勋章衡量维度</div>
+
+    <div style="margin-bottom:14px;">
+      <textarea id="scenarioInput" class="tool-scenario-input" placeholder="例如：采销使用采购审批功能完成审批、每日登录系统查看经营数据、使用商品搜索功能查找供应商..."></textarea>
+    </div>
+
+    <div>
+      <div style="font-size:13px;color:#5a7a95;margin-bottom:8px;">常见场景（点击快速选择）：</div>
+      <div class="tool-preset-tags">
+        <span class="tool-preset-tag" onclick="selectPreset(this,'使用采购审批功能完成审批流程')">📝 采购审批</span>
+        <span class="tool-preset-tag" onclick="selectPreset(this,'每日登录系统')">🔑 每日登录</span>
+        <span class="tool-preset-tag" onclick="selectPreset(this,'提交采购单')">📋 提交采购单</span>
+        <span class="tool-preset-tag" onclick="selectPreset(this,'连续使用数据看板查看经营数据')">📊 查看看板</span>
+        <span class="tool-preset-tag" onclick="selectPreset(this,'搜索商品或供应商')">🔍 搜索商品</span>
+        <span class="tool-preset-tag" onclick="selectPreset(this,'发布促销活动')">🎉 发布促销</span>
+        <span class="tool-preset-tag" onclick="selectPreset(this,'每日查看经营日报并跟进异常')">📈 经营日报</span>
+        <span class="tool-preset-tag" onclick="selectPreset(this,'与供应商在线沟通')">💬 供应商沟通</span>
+        <span class="tool-preset-tag" onclick="selectPreset(this,'填写结算单完成结算')">💰 填写结算单</span>
+        <span class="tool-preset-tag" onclick="selectPreset(this,'持续关注价格波动做比价')">📉 比价跟踪</span>
+      </div>
+    </div>
+
+    <div class="tool-btn-group">
+      <button class="tool-btn tool-btn-primary" onclick="analyzeScenario()">🔍 分析推荐</button>
+    </div>
+
+    <div id="recommendResult" class="tool-recommend-result"></div>
+  </div>
+
+  <!-- 数据输入 -->
+  <div class="section">
+    <div class="section-title"><span class="tool-section-icon" style="background:rgba(102,187,106,0.12)">📊</span> 使用数据输入</div>
+    <div class="tool-tip">请输入过去一段时间的使用数据（各天数/次数对应的用户人数），系统将以此为参考测算各层级达标比例</div>
+
+    <div class="tool-grid-2">
+      <div>
+        <div class="tool-data-header">
+          <span class="tool-data-header-title">使用数据</span>
+          <div class="tool-data-header-right">
+            <label>维度：</label>
+            <select id="dimension" class="tool-select" style="width:80px;" onchange="onDimensionChange()">
+              <option value="days">天数</option>
+              <option value="times">次数</option>
+            </select>
+          </div>
+        </div>
+        <table class="tool-table" id="usageTable">
+          <thead>
+            <tr>
+              <th style="width:38%;">使用<span class="dim-label">天数</span></th>
+              <th style="width:32%;">用户人数</th>
+              <th style="width:18%;">占比</th>
+              <th style="width:12%;"></th>
+            </tr>
+          </thead>
+          <tbody id="usageBody"></tbody>
+        </table>
+        <div class="tool-btn-group">
+          <button class="tool-btn tool-btn-primary tool-btn-sm" onclick="addUsageRow()">＋ 添加行</button>
+          <button class="tool-btn tool-btn-ghost tool-btn-sm" onclick="addBatchRows()">批量添加</button>
+          <button class="tool-btn tool-btn-danger tool-btn-sm" onclick="clearUsageData()">清空</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="tool-data-header" style="margin-bottom:12px">
+          <span class="tool-data-header-title">基本参数</span>
+        </div>
+        <div class="tool-form-field">
+          <label>整体用户总数 <span class="required">*</span></label>
+          <input type="number" id="totalUsers" class="tool-input" placeholder="例如：10000" min="1" oninput="recalculate()" style="width:100%;max-width:300px;">
+          <div class="tool-help-text">参与该勋章体系的所有目标用户数</div>
+        </div>
+
+        <div class="tool-form-field">
+          <label>参考数据覆盖周期</label>
+          <div class="tool-form-row">
+            <span class="unit">过去</span>
+            <select id="dataPeriod" class="tool-select" style="width:120px;" onchange="recalculate()">
+              <option value="0.25">1周</option>
+              <option value="0.5">2周</option>
+              <option value="1" selected>1个月</option>
+              <option value="2">2个月</option>
+              <option value="3">3个月</option>
+            </select>
+          </div>
+          <div class="tool-help-text">你输入的使用数据覆盖的时间范围，系统以此推算月均使用频率</div>
+        </div>
+
+        <div class="tool-form-field">
+          <label>预测上线后</label>
+          <div class="tool-form-row">
+            <span class="unit">上线</span>
+            <input type="number" id="forecastPeriod" class="tool-input" placeholder="3" min="1" value="3" style="width:72px;" oninput="recalculate()">
+            <span class="unit">个月后的达标比例</span>
+          </div>
+          <div class="tool-help-text">勋章上线后数据累加计算，预测经过这段时间后各层级的达标比例</div>
+        </div>
+
+        <div class="tool-quick-summary">
+          <div class="tool-quick-summary-title">📊 快速摘要</div>
+          <div id="quickSummary" class="tool-quick-summary-content">请先输入数据...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 勋章层级设定 -->
+  <div class="section">
+    <div class="section-title"><span class="tool-section-icon" style="background:rgba(255,167,38,0.12)">🏅</span> 勋章层级设定</div>
+
+    <div class="tool-grid-2">
+      <div>
+        <div class="tool-data-header" style="margin-bottom:12px">
+          <span class="tool-data-header-title">层级配置</span>
+        </div>
+        <table class="tool-table" id="tierTable">
+          <thead>
+            <tr>
+              <th>层级</th>
+              <th>名称</th>
+              <th>最低<span class="dim-label">天数</span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tierBody"></tbody>
+        </table>
+        <div class="tool-btn-group">
+          <button class="tool-btn tool-btn-primary tool-btn-sm" onclick="addTierRow()">＋ 添加层级</button>
+          <button class="tool-btn tool-btn-warning tool-btn-sm" onclick="loadPreset('standard')">载入铜银金3级</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="tool-data-header" style="margin-bottom:12px">
+          <span class="tool-data-header-title">🎯 推荐目标比例</span>
+        </div>
+        <div class="tool-tip">勋章数据累加计算，上线后从零开始累计。下表推荐比例是指「上线预测期后」各层级应有的达标比例——铜牌覆盖面广激励参与，金牌稀缺激发追求</div>
+        <table class="tool-table">
+          <thead>
+            <tr><th>层级</th><th>推荐达标比例<br><span style="font-weight:400;font-size:10px;color:#5a7a95">（上线预测期后）</span></th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="tool-badge badge-bronze">🥉 铜牌</span></td><td>25% ~ 45%</td><td style="text-align:left;font-size:13px;color:#8aabb5;">降低门槛，激励首次参与</td></tr>
+            <tr><td><span class="tool-badge badge-silver">🥈 银牌</span></td><td>10% ~ 25%</td><td style="text-align:left;font-size:13px;color:#8aabb5;">培养习惯，形成稳定使用</td></tr>
+            <tr><td><span class="tool-badge badge-gold">🥇 金牌</span></td><td>3% ~ 10%</td><td style="text-align:left;font-size:13px;color:#8aabb5;">稀缺荣誉，标杆示范</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 计算按钮 -->
+  <div class="tool-btn-center">
+    <button class="tool-btn tool-btn-primary tool-btn-lg" onclick="calculate()">🚀 开始计算</button>
+  </div>
+
+  <!-- 计算结果 -->
+  <div class="section">
+    <div class="section-title"><span class="tool-section-icon" style="background:rgba(79,195,247,0.12)">📈</span> 计算结果</div>
+    <div id="resultPlaceholder" class="tool-result-placeholder">
+      <div class="placeholder-icon">📊</div>
+      <div class="placeholder-text">请输入数据后点击「开始计算」</div>
+    </div>
+    <div id="resultArea" style="display:none;"></div>
+  </div>
+
+  <!-- 推荐方案 -->
+  <div class="section" id="recommendSection" style="display:none;">
+    <div class="section-title"><span class="tool-section-icon" style="background:rgba(255,215,0,0.12)">⭐</span> 智能推荐方案</div>
+    <div id="recommendArea"></div>
+  </div>
+
+</div>
+
+<!-- ============================================== -->
+<!-- ===== Tab 2: 勋章体系数据分析 ===== -->
+<!-- ============================================== -->
+<div id="dashboardContent" class="container tab-content">
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- Insights -->
+  <div class="insights" id="insights"></div>
+
+  <!-- User Distribution — 只保留趋势曲线，去掉柱形图 -->
+  <div class="section" style="padding:28px 32px">
+    <div style="text-align:center;margin-bottom:6px">
+      <div style="font-size:22px;font-weight:700;color:#b0d4f1;letter-spacing:2px">采销岗勋章持有量分布</div>
+      <div style="font-size:13px;color:#5a7a95;margin-top:4px" id="distSubtitle"></div>
+    </div>
+    <div class="dist-highlight" id="distHighlight"></div>
+    <div style="margin-top:16px">
+      <div style="font-size:14px;font-weight:600;color:#8aabb5;margin-bottom:10px;padding-left:8px;border-left:3px solid #26c6da">持有数量分布（趋势曲线）</div>
+      <div class="chart-container" style="height:420px"><canvas id="chartUserDistCurve"></canvas></div>
+    </div>
+    <div id="distConclusions" style="margin-top:20px"></div>
+  </div>
+
+  <!-- Medal Classification Overview -->
+  <div class="section">
+    <div class="section-title cyan">🗂️ 勋章分类全景 — 四大目的类型详解</div>
+    <div id="classOverview"></div>
+  </div>
+
+  <!-- Dimension Overview -->
+  <div class="section">
+    <div class="section-title gold">🏷️ 勋章维度总览 — 按目的 & 类型 & 属性分布</div>
+    <div class="dim-stats" id="dimStats"></div>
+    <div class="chart-row triple">
+      <div class="chart-container"><canvas id="chartPurpose"></canvas></div>
+      <div class="chart-container"><canvas id="chartType"></canvas></div>
+      <div class="chart-container"><canvas id="chartAttr"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Medal Popularity Table -->
+  <div class="section">
+    <div class="section-title">🏅 勋章发放排行 — 采销岗各勋章获得人数</div>
+    <div class="sort-btns" id="sortBtns"></div>
+    <div class="medal-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px;text-align:center">#</th>
+            <th>勋章名称</th>
+            <th>目的类型</th>
+            <th>勋章类型</th>
+            <th>属性</th>
+            <th style="text-align:right">获得人数</th>
+            <th style="text-align:right">获得率</th>
+            <th class="bar-cell">占比可视化</th>
+            <th>等级 <span style="font-weight:400;font-size:10px;color:#5a7a95">(获得难度)</span></th>
+          </tr>
+        </thead>
+        <tbody id="medalTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Charts Row 1 -->
+  <div class="chart-row">
+    <div class="section">
+      <div class="section-title">📊 勋章获得人数 Top 20</div>
+      <div class="chart-container"><canvas id="chartTopMedals"></canvas></div>
+    </div>
+    <div class="section">
+      <div class="section-title">📈 勋章持有区间分布</div>
+      <div class="chart-container"><canvas id="chartRanges"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2 -->
+  <div class="section">
+    <div class="section-title">🎯 勋章等级分布</div>
+    <div style="margin-bottom:14px;padding:14px;background:rgba(255,167,38,0.06);border-radius:10px;font-size:13px;color:#b0d4f1;line-height:2">
+      <strong style="color:#ffa726">📌 等级含义说明：</strong>按发放率划分获取难度等级——<br>
+      <span style="color:#5a7a95;font-weight:700">无人获得</span> = 发放率0% → <span style="color:#7a9bb5">尚无采销岗员工获得</span><br>
+      <span style="color:#ef5350;font-weight:700">困难</span> = 发放率0%-10% → <span style="color:#7a9bb5">极少数人能获得</span><br>
+      <span style="color:#ff7043;font-weight:700">较难</span> = 发放率10%-30% → <span style="color:#7a9bb5">需要一定努力才能获得</span><br>
+      <span style="color:#ffa726;font-weight:700">适中</span> = 发放率30%-60% → <span style="color:#7a9bb5">大部分活跃用户可获得</span><br>
+      <span style="color:#66bb6a;font-weight:700">简单</span> = 发放率≥60% → <span style="color:#7a9bb5">人人可得，含金量低</span>
+    </div>
+    <div class="chart-container" style="max-width:420px;margin:0 auto"><canvas id="chartTierPie"></canvas></div>
+  </div>
+
+  <!-- Difficulty Distribution — 只保留柱形图，去掉曲线图 -->
+  <div class="section">
+    <div class="section-title rose">🎯 勋章难易程度分布 — 发放率区间分析</div>
+    <div id="diffHighlight" style="margin-bottom:16px"></div>
+    <div class="chart-container" style="height:400px"><canvas id="chartDiffDist"></canvas></div>
+    <div id="diffInsights" style="margin-top:16px"></div>
+    <div style="margin-top:16px">
+      <div style="font-size:14px;font-weight:600;color:#8aabb5;margin-bottom:10px;padding-left:8px;border-left:3px solid #f06292">各发放率区间勋章明细</div>
+      <div class="medal-table-wrap" style="max-height:420px">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px;text-align:center">#</th>
+              <th>勋章名称</th>
+              <th>目的类型</th>
+              <th>勋章类型</th>
+              <th style="text-align:right">获得人数</th>
+              <th style="text-align:right">发放率</th>
+              <th>难度等级</th>
+            </tr>
+          </thead>
+          <tbody id="diffTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Percentile -->
+  <div class="section">
+    <div class="section-title">📐 勋章数量百分位分析</div>
+    <div class="percentile-bar" id="percentileBar"></div>
+  </div>
+
+  <!-- Cumulative -->
+  <div class="chart-row full">
+    <div class="section">
+      <div class="section-title">📉 累计人数曲线（拥有 ≥ N 枚勋章的采销岗用户占比）</div>
+      <div class="chart-container"><canvas id="chartCumulative"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Department Analysis -->
+  <div class="section">
+    <div class="section-title gold">🏛️ 采销岗二级部门人均勋章对比</div>
+    <div class="dept-grid" id="deptCards"></div>
+    <div class="chart-row">
+      <div class="chart-container"><canvas id="chartDeptAvg"></canvas></div>
+      <div class="chart-container"><canvas id="chartDeptSingleRate"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title purple">👥 采销岗岗位细分对比</div>
+    <div class="dept-grid" id="roleCards"></div>
+    <div class="chart-row">
+      <div class="chart-container"><canvas id="chartRoleAvg"></canvas></div>
+      <div class="chart-container"><canvas id="chartRoleSingleRate"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title green">🏷️ TOP20勋章在采销岗二级部门的分布</div>
+    <div class="chart-container"><canvas id="chartMedalDeptStack"></canvas></div>
+  </div>
+
+  <!-- Medal Conditions & Upgrade Paths -->
+  <div class="section" style="padding-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleCondPanel()">
+      <div class="section-title purple" style="margin-bottom:0">📋 勋章获得条件与升级路径（点击展开）</div>
+      <div id="condToggleIcon" style="font-size:20px;color:#7a9bb5;transition:transform 0.3s">▼</div>
+    </div>
+    <div id="condPanel" style="max-height:0;overflow:hidden;transition:max-height 0.4s ease">
+      <div class="sort-btns" id="condSortBtns" style="margin:16px 0 12px"></div>
+      <div id="medalCondGrid"></div>
+    </div>
+  </div>
+
+  <!-- Recommendations -->
+  <div class="section">
+    <div class="section-title orange">💡 针对采销岗的勋章体系优化建议</div>
+    <div class="rec-grid" id="recommendations"></div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<script>
+// ==================== Tab Switching ====================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+  if (tab === 'tool') {
+    document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+    document.getElementById('toolContent').classList.add('active');
+  } else {
+    document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+    document.getElementById('dashboardContent').classList.add('active');
+  }
+}
+
+// ==================== Dashboard Data & Logic ====================
+const DATA = {"totalUsersWithMedals":11066,"totalEmployees":12487,"uniqueMedals":51,"avgMedals":13.82,"medianMedals":15,"maxMedals":35,"medals":[{"code":"GreatSuccess","name":"66大顺","count":11046,"purpose":"场景情感类","medal_type":"纪念勋章","attribute":"升级勋章","link":"无","rule":"2026年在职既有","launch_date":"15号晚上线，16号宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【2026勋章】--66大顺"},{"code":"PerfectAttendance","name":"持之以恒","count":10380,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"无","rule":"连续登陆21天获得金勋章\n连续登陆14天获得银勋章\n连续登陆7天获得铜勋章","launch_date":"2025年9月1号，2号宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【连续登录】-持之以恒"},{"code":"DragonBoatFestivalWellBeing","name":"端午安康","count":9006,"purpose":"场景情感类","medal_type":"纪念勋章","attribute":"升级勋章","link":"无","rule":"2016年6月19号-2016年6月30号期间登录获取","launch_date":"612晚上线，613宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【端午节相关】-端午安康"},{"code":"PioneerOfLanding","name":"日积月累","count":8675,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"无","rule":"累计登陆999天获得金勋章\n累计登陆300天获得银勋章\n累计登陆100天获得铜勋章","launch_date":"2025年11月14号，15号宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【累计登陆】-日积月累"},{"code":"FootprintsOfStruggle","name":"奋斗足迹","count":8433,"purpose":"场景情感类","medal_type":"纪念勋章","attribute":"升级勋章","link":"无","rule":"2026年5月30号-2026年6月30号登录领取","launch_date":"","note":"上线弹窗：有\n 获得弹窗：有","period":"","full_name":"【618勋章】-奋斗足迹"},{"code":"HappyNewYear","name":"新春贺岁","count":7924,"purpose":"场景情感类","medal_type":"纪念勋章","attribute":"升级勋章","link":"无","rule":"2026年2月14号-2026年3月14号登录领取","launch_date":"13号晚上上线，14号宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【春节纪念】--新春贺岁"},{"code":"TimePartner","name":"时间合伙人","count":7112,"purpose":"场景情感类","medal_type":"成长勋章","attribute":"升级勋章","link":"无","rule":"入职时间大于等于10年获得金勋章\n入职时间大于等于5年小于10年获得银勋章\n入职时间大于等于1年小于5年获得铜勋章","launch_date":"518晚上线，519宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"时间合伙人"},{"code":"GlobalExploration","name":"全域探索","count":6828,"purpose":"功能牵引类","medal_type":"成长勋章","attribute":"升级勋章","link":"无","rule":"累计查看50篇精选文章/课程获得金勋章\n累计查看15篇精选文章/课程获得银勋章\n累计查看1篇精选文章/课程获得铜勋章","launch_date":"26号晚上线。27宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【使用模块个数】--全域探索"},{"code":"SmartSearchExpert","name":"智搜达人","count":6136,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"无","rule":"累计使用AI搜索60次获得金勋章\n累计使用AI搜索30次获得银勋章\n累计使用AI搜索10次获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【ai搜索使用相关】--智搜达人"},{"code":"LightIlluminatingTheFuture","name":"灯映前程","count":5972,"purpose":"场景情感类","medal_type":"纪念勋章","attribute":"升级勋章","link":"无","rule":"2026年3月3日登陆领取","launch_date":"2号晚上上线，3号宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【元宵节勋章】--灯映前程"},{"code":"OswGrow","name":"采销成长","count":5737,"purpose":"功能牵引类","medal_type":"成长勋章","attribute":"升级勋章","link":"https://learn-osw.jd.com/knowledge/osw/home","rule":"累计查看50篇精选文章/课程获得金勋章\n累计查看15篇精选文章/课程获得银勋章\n累计查看1篇精选文章/课程获得铜勋章","launch_date":"2025年12月18号，19号宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"采销成长"},{"code":"AnnualCompanion","name":"年度同行者","count":5641,"purpose":"场景情感类","medal_type":"纪念勋章","attribute":"升级勋章","link":"无","rule":"2025年在职既有","launch_date":"2025年12月31号，2026年1月1号号宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"2025年勋章","full_name":"【2025年度】-年度同行者"},{"code":"IntelligentDrivingExpert","name":"智驭能手","count":5630,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/0/start","rule":"累计使用ai专员200次获得金勋章\n累计使用ai专员100次获得银勋章\n累计使用ai专员30次获得铜勋章","launch_date":"29号晚上线，30号宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【ai专员使用相关】--智驭能手"},{"code":"IntelligentLearningPioneer","name":"智学先锋","count":5537,"purpose":"学习成长类","medal_type":"成长勋章","attribute":"升级勋章","link":"https://hr.jd.com/myhr/training/homepage?extIframeUrl=https%253A%252F%252Fl.jd.com%252Fpc%252Fcourse%253Fproject_id%253D1203705960%2526courseId%253D1239979353%2526contentType%253D1002%2526projectContentId%253D1240076509%2526contentId%253D1239985401&jdme_router=jdme%3A%2F%2Fweb%2F201903250420%3Fmparam%3D%257B%2522url%2522%253A%2522https%253A%252F%252Fl.jd.com%252Fm%252Fcourse%253Fproject_id%253D1203705960%2522%257D","rule":"白名单勋章","launch_date":"4/1晚上线，4/2宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【AI培训课程学习勋章】--智学先锋"},{"code":"DoubleElevenPromotion","name":"战斗印记","count":5477,"purpose":"场景情感类","medal_type":"纪念勋章","attribute":"升级勋章","link":"无","rule":"2025年11月11号-2025年11月25号登录领取","launch_date":"2025年10月28号，29号宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【双十一纪念】-战斗印记"},{"code":"ToolMaster","name":"工具大师","count":5352,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/tool-box/","rule":"累计使用工具箱工具12次获得金勋章\n累计使用工具箱工具4次获得银勋章\n累计使用工具箱工具1次获得铜勋章","launch_date":"27号上线，28号宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【使用工具箱次数】-工具大师"},{"code":"AreaInspector","name":"全域巡检官","count":5235,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/0/start","rule":"累计使用AI巡检专员下技能个数5个获得金勋章\n累计使用AI巡检专员下技能个数3个获得银勋章\n累计使用AI巡检专员下技能个数1个获得铜勋章","launch_date":"6/8晚上线，6/9宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【AI巡检专员使用技能个数相关】-全域巡检官"},{"code":"SupperConnector","name":"超级运营","count":5089,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw-public-pro.local-pf.jd.com/deeplink-redirect.html?redirect_url=www.jd.com","rule":"累计使用100天获得金勋章\n累计使用21天获得银勋章\n累计使用7天获得铜勋章","launch_date":"22号晚上线，23宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【超级插件】--超级运营"},{"code":"OperationsEfficiencySpecialist","name":"运营提效师","count":4081,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/0/start","rule":"累计使用AI运营专员下技能个数9个获得金勋章\n累计使用AI运营专员下技能个数5个获得银勋章\n累计使用AI运营专员下技能个数3个获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【AI运营专员使用技能个数相关】-运营提效师"},{"code":"AnalyzingBaiShiTong","name":"分析百事通","count":4037,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/0/start","rule":"累计使用AI分析专员下技能个数5个获得金勋章\n累计使用AI分析专员下技能个数3个获得银勋章\n累计使用AI分析专员下技能个数1个获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【AI分析专员使用技能个数相关】-分析百事通"},{"code":"PursueKnowledge","name":"笃行求知","count":3262,"purpose":"学习成长类","medal_type":"成长勋章","attribute":"升级勋章","link":"https://joyspace.jd.com/pages/aOjKs00UcUkEqqmSgH3N","rule":"C2维度发放","launch_date":"19号晚上上线，20号宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【参与线下培训勋章】--笃行求知"},{"code":"SeekingExpertOpinions","name":"智问行家","count":3196,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://aihelper.jd.com/assistant/chat","rule":"累计使用AI助手15次获得金勋章\n累计使用AI助手8次获得银勋章\n累计使用AI助手3次获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【ai助手使用相关】--智问行家"},{"code":"SpottingTalentAtGlance","name":"慧眼识珠","count":2456,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/scrm/clueManagementList?name=claimClue","rule":"累计使用CRM20次获得金勋章\n累计使用CRM10次获得银勋章\n累计使用CRM6次获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【使用CRM次数】-慧眼识珠"},{"code":"StriveMakeSucceed","name":"元气劳模","count":2326,"purpose":"功能牵引类","medal_type":"纪念勋章","attribute":"升级勋章","link":"无","rule":"2026年4月30号-2026年5月10号登陆领取","launch_date":"4/29晚上线，4/30宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【五一劳动节勋章】--元气劳模"},{"code":"DataExpress","name":"超级数据官","count":1944,"purpose":"生态共创类","medal_type":"限定勋章","attribute":"升级勋章","link":"无","rule":"白名单勋章","launch_date":"528晚上线","note":"上线弹窗：无\n 获得弹窗：有","period":"","full_name":"【大表共建相关勋章】-超级数据官"},{"code":"PracticalTrainingSpecialist","name":"实操培训专家","count":1627,"purpose":"学习成长类","medal_type":"成长勋章","attribute":"升级勋章","link":"无","rule":"","launch_date":"","note":"","period":"","full_name":"实操培训专家"},{"code":"PioneerForAttractingTalent","name":"引凤先锋","count":1138,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/cz/bundling/pop2Self/center","rule":"累计邀约并升级成功的店铺数达20个获得金勋章\n累计邀约并升级成功的店铺数达10个获得银勋章\n累计邀约并升级成功的店铺数达1个获得铜勋章","launch_date":"623晚上线，624宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【引凤计划相关】-引凤先锋"},{"code":"NewcomerOnboardingHome","name":"新人带教家","count":765,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/seller-account/purchasing-sales-user-management","rule":"累计给1名入职90天内新员工分配权限获得铜勋章\n累计给2名入职90天内新员工分配权限获得银勋章\n累计给3名入职90天内新员工分配权限获得金勋章","launch_date":"629晚上线，632宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【给新员工分配权限勋章】-新人带教家"},{"code":"IntelligentDrive","name":"自动化达人","count":609,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/0/start","rule":"累计使用RPA200次获得金勋章\n累计使用RPA100次获得银勋章\n累计使用RPA50次获得铜勋章","launch_date":"4/20晚上线，4/21宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【流程自动化勋章】--自动化达人"},{"code":"EfficiencyChampion","name":"模板优选家","count":429,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/9/9?path=%2Fspreadsheets%2F24362862","rule":"超级大表模板累计使用50次获得金勋章\n超级大表模板累计使用21次获得银勋章\n超级大表模板累计使用7次获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"模板优选家"},{"code":"OriginalStar","name":"原创制表人","count":269,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/9/9?path=%2Fspreadsheets%2F24362862","rule":"超级大表累计上传10个模板获得金勋章\n超级大表累计上传3个模板获得银勋章\n超级大表累计上传1个模板获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【超级大表上传模版个数勋章】--原创制表人"},{"code":"CollaborativeProxy","name":"协作代行人","count":265,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/seller-account/purchasing-sales-user-management","rule":"累计代理2人名下权限获得铜勋章\n累计代理4人名下权限获得银勋章\n累计代理7人名下权限获得金勋章","launch_date":"629晚上线，631宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【代理权限个数勋章】-协作代行人"},{"code":"CreativeExperienceOfficer","name":"创意体验官","count":244,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://aitool.jd.com/guide/community","rule":"累计使用功能5次获得金勋章\n累计使用功能3次获得银勋章\n累计使用功能1次获得铜勋章","launch_date":"525晚上线，526宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【AI创意社区功能累计使用次数】-创意体验官"},{"code":"AIMovieEnthusiast","name":"AI视频达人","count":217,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"非升级勋章","link":"无","rule":"","launch_date":"","note":"","period":"","full_name":"AI视频达人"},{"code":"ProductCoCreators","name":"感恩共建","count":171,"purpose":"生态共创类","medal_type":"限定勋章","attribute":"升级勋章","link":"无","rule":"白名单勋章","launch_date":"2025年11月27号，28号宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【采销工作台纪念】-感恩共建"},{"code":"ShareTheVanguards","name":"数据分享家","count":112,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/9/9?path=%2Fspreadsheets%2F24362862","rule":"超级大表文件累计分享50次获得金勋章\n超级大表文件累计分享15次获得银勋章\n超级大表文件累计分享5次获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【超级大表文件分享次数勋章】--数据分享家"},{"code":"AIThinkTank","name":"AI智囊团","count":104,"purpose":"生态共创类","medal_type":"限定勋章","attribute":"升级勋章","link":"无","rule":"白名单勋章","launch_date":"611晚上线，612宣发","note":"","period":"","full_name":"【AI-SKILL共建勋章】-AI智囊团"},{"code":"EmergencyGuardian","name":"应急守护人","count":95,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/seller-account/purchasing-sales-user-management","rule":"累计触发2次小于7天的权限代理获得铜勋章\n累计触发4次小于7天的权限代理获得银勋章\n累计触发6次小于7天的权限代理获得金勋章","launch_date":"629晚上线，633宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【触发7天权限代理勋章】-应急守护人"},{"code":"TrustAuthorizationHome","name":"信任授权家","count":76,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/seller-account/purchasing-sales-user-management","rule":"累计分配我的名下权限给3人获得铜勋章\n累计分配我的名下权限给4人获得银勋章\n累计分配我的名下权限给6人获得金勋章","launch_date":"629晚上线，630宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【分配我的名下权限给X人】-信任授权家"},{"code":"InteractiveStar","name":"互动之星","count":56,"purpose":"学习成长类","medal_type":"成长勋章","attribute":"升级勋章","link":"https://joyspace.jd.com/pages/aOjKs00UcUkEqqmSgH3N","rule":"白名单勋章","launch_date":"","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【线下培训活跃份子】--互动之星"},{"code":"LuckyFishAtNewYear","name":"开年锦鲤","count":46,"purpose":"生态共创类","medal_type":"限定勋章","attribute":"升级勋章","link":"无","rule":"白名单勋章","launch_date":"4号晚上上线，5号宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【H5年终活动中奖人员】-开年锦鲤"},{"code":"RoleModelPower","name":"榜样力量","count":36,"purpose":"学习成长类","medal_type":"成长勋章","attribute":"升级勋章","link":"https://joyspace.jd.com/pages/aOjKs00UcUkEqqmSgH3N","rule":"白名单勋章","launch_date":"","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【线下培训案例分享】--榜样力量"},{"code":"AIResourcefulPerson","name":"AI智多星","count":28,"purpose":"生态共创类","medal_type":"限定勋章","attribute":"升级勋章","link":"无","rule":"白名单勋章","launch_date":"1月7号晚上线，8号宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【AI活动勋章】-AI智多星"},{"code":"TrueInHousTrader","name":"真内贸交易员","count":27,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"非升级勋章","link":"无","rule":"","launch_date":"","note":"","period":"","full_name":"真内贸交易员"},{"code":"GrowthInsightOfficer","name":"成长洞察官","count":27,"purpose":"生态共创类","medal_type":"限定勋章","attribute":"升级勋章","link":"https://learn-osw.jd.com/knowledge/osw/guide?keys=KyOvFchrsBu8AxiAuEQt%2CNrT5oxrCkZc47OSCt5Zh%2CFjgyiKYdzVT1ELqT0GMR&teamId=aX5JkNdEaVSnlgAPG5EqK","rule":"白名单勋章","launch_date":"12号晚上上线，13号宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【成长调研活动勋章】--成长洞察官"},{"code":"SuperDataOfficer","name":"超级分析师","count":20,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/9/9?path=%2Fspreadsheets%2F24362862","rule":"超级大表累计使用100天获得金勋章\n超级大表累计使用21天获得银勋章\n超级大表累计使用7天获得铜勋章","launch_date":"4/23晚上线，4/24宣发","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【超级大表累计使用天数勋章】--超级分析师"},{"code":"GrowtCoBuilder","name":"成长共筑者","count":15,"purpose":"生态共创类","medal_type":"成长勋章","attribute":"升级勋章","link":"https://learn-osw.jd.com/knowledge/osw/guide?keys=KyOvFchrsBu8AxiAuEQt%2CNrT5oxrCkZc47OSCt5Zh%2C2rLyQb33OcxlKHpoIZtU&teamId=aX5JkNdEaVSnlgAPG5EqK","rule":"白名单勋章","launch_date":"4/9晚上线，4/10宣发","note":"上线弹窗：无\n获得弹窗：正常","period":"","full_name":"【成长共建活动勋章】--成长共筑者"},{"code":"CreativeTemplateDesigner","name":"创意模版师","count":13,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://aitool.jd.com/guide/community","rule":"累计创建模版10个获得金勋章\n累计创建模版5个获得银勋章\n累计创建模版3个获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"创意模版师"},{"code":"ProcessIntelligenceController","name":"流程智控师","count":0,"purpose":"功能牵引类","medal_type":"荣誉勋章","attribute":"升级勋章","link":"https://osw.jd.com/myflow/0/start","rule":"累计使用流程自动化下技能个数5个获得金勋章\n累计使用流程自动化下技能个数3个获得银勋章\n累计使用流程自动化下技能个数1个获得铜勋章","launch_date":"","note":"上线弹窗：正常\n获得弹窗：正常","period":"","full_name":"【AI流程自动化使用技能个数相关】-流程智控师"},{"code":"KnowledgeCollector","name":"知识收藏家","count":0,"purpose":"学习成长类","medal_type":"成长勋章","attribute":"升级勋章","link":"无","rule":"","launch_date":"","note":"","period":"","full_name":"知识收藏家"},{"code":"KnowledgeSharer","name":"知识分享家","count":0,"purpose":"生态共创类","medal_type":"荣誉勋章","attribute":"非升级勋章","link":"无","rule":"","launch_date":"","note":"","period":"","full_name":"知识分享家"}],"distribution":[{"count":1,"users":168},{"count":2,"users":321},{"count":3,"users":314},{"count":4,"users":382},{"count":5,"users":323},{"count":6,"users":321},{"count":7,"users":310},{"count":8,"users":361},{"count":9,"users":353},{"count":10,"users":407},{"count":11,"users":449},{"count":12,"users":548},{"count":13,"users":610},{"count":14,"users":658},{"count":15,"users":670},{"count":16,"users":664},{"count":17,"users":648},{"count":18,"users":669},{"count":19,"users":657},{"count":20,"users":586},{"count":21,"users":528},{"count":22,"users":422},{"count":23,"users":300},{"count":24,"users":191},{"count":25,"users":103},{"count":26,"users":65},{"count":27,"users":19},{"count":28,"users":10},{"count":29,"users":6},{"count":30,"users":2},{"count":35,"users":1}],"ranges":[{"label":"1枚","count":168},{"label":"2-3枚","count":635},{"label":"4-5枚","count":705},{"label":"6-10枚","count":1752},{"label":"11-15枚","count":2935},{"label":"16-20枚","count":3224},{"label":"21-25枚","count":1544},{"label":"26枚以上","count":103}],"topPairs":[{"medal1":"66大顺","medal2":"持之以恒","count":10362},{"medal1":"端午安康","medal2":"66大顺","count":9006},{"medal1":"端午安康","medal2":"持之以恒","count":8683},{"medal1":"66大顺","medal2":"日积月累","count":8672},{"medal1":"持之以恒","medal2":"日积月累","count":8616},{"medal1":"奋斗足迹","medal2":"66大顺","count":8433},{"medal1":"端午安康","medal2":"奋斗足迹","count":8228},{"medal1":"奋斗足迹","medal2":"持之以恒","count":8169},{"medal1":"66大顺","medal2":"新春贺岁","count":7924},{"medal1":"端午安康","medal2":"日积月累","count":7867},{"medal1":"新春贺岁","medal2":"持之以恒","count":7787},{"medal1":"新春贺岁","medal2":"日积月累","count":7646},{"medal1":"奋斗足迹","medal2":"日积月累","count":7537},{"medal1":"端午安康","medal2":"新春贺岁","count":7318},{"medal1":"66大顺","medal2":"时间合伙人","count":7112}],"percentiles":{"p10":4,"p25":9,"p50":15,"p75":19,"p90":22,"p95":23,"p99":25},"typeBreakdown":{"纪念勋章":8,"荣誉勋章":27,"成长勋章":10,"限定勋章":6},"purposeBreakdown":{"场景情感类":8,"功能牵引类":29,"学习成长类":6,"生态共创类":8},"attrBreakdown":{"升级勋章":48,"非升级勋章":3},"typeUserCounts":{"纪念勋章":55825,"荣誉勋章":64546,"成长勋章":30210,"限定勋章":2320},"purposeUserCounts":{"场景情感类":60611,"功能牵引类":79437,"学习成长类":10518,"生态共创类":2335},"attrUserCounts":{"升级勋章":152657,"非升级勋章":244},"launchTimeline":[{"name":"66大顺","date":"15号晚上线，16号宣发","type":"纪念勋章","purpose":"场景情感类","count":52516},{"name":"时间合伙人","date":"518晚上线，519宣发","type":"成长勋章","purpose":"场景情感类","count":29863},{"name":"端午安康","date":"612晚上线，613宣发","type":"纪念勋章","purpose":"场景情感类","count":20427},{"name":"持之以恒","date":"2025年9月1号，2号宣发","type":"荣誉勋章","purpose":"功能牵引类","count":16551},{"name":"新春贺岁","date":"13号晚上上线，14号宣发","type":"纪念勋章","purpose":"场景情感类","count":15310},{"name":"日积月累","date":"2025年11月14号，15号宣发","type":"荣誉勋章","purpose":"功能牵引类","count":12360},{"name":"全域探索","date":"26号晚上线。27宣发","type":"成长勋章","purpose":"功能牵引类","count":10903},{"name":"战斗印记","date":"2025年10月28号，29号宣发","type":"纪念勋章","purpose":"场景情感类","count":9332},{"name":"灯映前程","date":"2号晚上上线，3号宣发","type":"纪念勋章","purpose":"场景情感类","count":9194},{"name":"年度同行者","date":"2025年12月31号，2026年1月1号号宣发","type":"纪念勋章","purpose":"场景情感类","count":8690},{"name":"采销成长","date":"2025年12月18号，19号宣发","type":"成长勋章","purpose":"功能牵引类","count":8053},{"name":"智驭能手","date":"29号晚上线，30号宣发","type":"荣誉勋章","purpose":"功能牵引类","count":6829},{"name":"工具大师","date":"27号上线，28号宣发","type":"荣誉勋章","purpose":"功能牵引类","count":6560},{"name":"智学先锋","date":"4/1晚上线，4/2宣发","type":"成长勋章","purpose":"学习成长类","count":6445},{"name":"超级运营","date":"22号晚上线，23宣发","type":"荣誉勋章","purpose":"功能牵引类","count":6260},{"name":"全域巡检官","date":"6/8晚上线，6/9宣发","type":"荣誉勋章","purpose":"功能牵引类","count":5883},{"name":"笃行求知","date":"19号晚上上线，20号宣发","type":"成长勋章","purpose":"学习成长类","count":3879},{"name":"元气劳模","date":"4/29晚上线，4/30宣发","type":"纪念勋章","purpose":"功能牵引类","count":3752},{"name":"超级数据官","date":"528晚上线","type":"限定勋章","purpose":"生态共创类","count":2148},{"name":"引凤先锋","date":"623晚上线，624宣发","type":"荣誉勋章","purpose":"功能牵引类","count":1157},{"name":"新人带教家","date":"629晚上线，632宣发","type":"荣誉勋章","purpose":"功能牵引类","count":817},{"name":"自动化达人","date":"4/20晚上线，4/21宣发","type":"荣誉勋章","purpose":"功能牵引类","count":673},{"name":"创意体验官","date":"525晚上线，526宣发","type":"荣誉勋章","purpose":"功能牵引类","count":315},{"name":"协作代行人","date":"629晚上线，631宣发","type":"荣誉勋章","purpose":"功能牵引类","count":276},{"name":"感恩共建","date":"2025年11月27号，28号宣发","type":"限定勋章","purpose":"生态共创类","count":213},{"name":"AI智囊团","date":"611晚上线，612宣发","type":"限定勋章","purpose":"生态共创类","count":119},{"name":"应急守护人","date":"629晚上线，633宣发","type":"荣誉勋章","purpose":"功能牵引类","count":99},{"name":"信任授权家","date":"629晚上线，630宣发","type":"荣誉勋章","purpose":"功能牵引类","count":82},{"name":"开年锦鲤","date":"4号晚上上线，5号宣发","type":"限定勋章","purpose":"生态共创类","count":58},{"name":"AI智多星","date":"1月7号晚上线，8号宣发","type":"限定勋章","purpose":"生态共创类","count":53},{"name":"超级分析师","date":"4/23晚上线，4/24宣发","type":"荣誉勋章","purpose":"功能牵引类","count":36},{"name":"成长洞察官","date":"12号晚上上线，13号宣发","type":"限定勋章","purpose":"生态共创类","count":32},{"name":"成长共筑者","date":"4/9晚上线，4/10宣发","type":"成长勋章","purpose":"生态共创类","count":17}],"purposeTypeMatrix":{"场景情感类|纪念勋章":7,"功能牵引类|荣誉勋章":26,"场景情感类|成长勋章":1,"功能牵引类|成长勋章":2,"学习成长类|成长勋章":6,"功能牵引类|纪念勋章":1,"生态共创类|限定勋章":6,"生态共创类|成长勋章":1,"生态共创类|荣誉勋章":1}};
+const DEPT = {"deptSummary":[{"name":"家电家居事业群","total":2513,"avg":13.67,"median":14,"max":35,"singleCount":29,"singleRate":1.2,"medalTotal":34355},{"name":"大商超事业群","total":2080,"avg":15.6,"median":17,"max":29,"singleCount":9,"singleRate":0.4,"medalTotal":32456},{"name":"3C数码事业群","total":1338,"avg":15.75,"median":17,"max":29,"singleCount":3,"singleRate":0.2,"medalTotal":21070},{"name":"大时尚事业群","total":1262,"avg":14.68,"median":16,"max":30,"singleCount":12,"singleRate":1.0,"medalTotal":18524},{"name":"京喜事业部","total":908,"avg":13.0,"median":14,"max":27,"singleCount":6,"singleRate":0.7,"medalTotal":11802},{"name":"创新零售事业群","total":690,"avg":9.46,"median":8,"max":29,"singleCount":41,"singleRate":5.9,"medalTotal":6528},{"name":"跨境事业部","total":390,"avg":14.01,"median":15,"max":25,"singleCount":3,"singleRate":0.8,"medalTotal":5465},{"name":"汽车事业部","total":306,"avg":15.22,"median":16,"max":28,"singleCount":2,"singleRate":0.7,"medalTotal":4656},{"name":"集团政企业务部","total":235,"avg":11.14,"median":12,"max":22,"singleCount":3,"singleRate":1.3,"medalTotal":2619},{"name":"营养保健业务部","total":212,"avg":13.95,"median":15,"max":24,"singleCount":2,"singleRate":0.9,"medalTotal":2958},{"name":"医药业务部","total":203,"avg":13.05,"median":15,"max":22,"singleCount":4,"singleRate":2.0,"medalTotal":2649},{"name":"工业品平台业务部","total":200,"avg":16.34,"median":17,"max":25,"singleCount":6,"singleRate":3.0,"medalTotal":3269},{"name":"MRO业务部","total":174,"avg":5.37,"median":4,"max":17,"singleCount":11,"singleRate":6.3,"medalTotal":934},{"name":"自有品牌业务部","total":168,"avg":11.61,"median":12,"max":25,"singleCount":3,"singleRate":1.8,"medalTotal":1951},{"name":"消费器械业务部","total":88,"avg":14.32,"median":15,"max":26,"singleCount":0,"singleRate":0.0,"medalTotal":1260},{"name":"BOM业务部","total":76,"avg":4.84,"median":4,"max":15,"singleCount":12,"singleRate":15.8,"medalTotal":368},{"name":"医疗器械业务部","total":63,"avg":15.76,"median":17,"max":25,"singleCount":0,"singleRate":0.0,"medalTotal":993},{"name":"SMB业务部","total":31,"avg":6.58,"median":5,"max":17,"singleCount":0,"singleRate":0.0,"medalTotal":204},{"name":"即时零售业务部","total":23,"avg":9.09,"median":10,"max":15,"singleCount":1,"singleRate":4.3,"medalTotal":209},{"name":"本地生活服务事业群","total":17,"avg":11.71,"median":13,"max":19,"singleCount":2,"singleRate":11.8,"medalTotal":199},{"name":"跨境业务一部","total":15,"avg":4.13,"median":2,"max":20,"singleCount":6,"singleRate":40.0,"medalTotal":62},{"name":"国际商品供应链部","total":12,"avg":4.17,"median":3,"max":14,"singleCount":0,"singleRate":0.0,"medalTotal":50},{"name":"大客户部","total":11,"avg":7.45,"median":6,"max":17,"singleCount":1,"singleRate":9.1,"medalTotal":82},{"name":"跨境业务三部","total":10,"avg":6.0,"median":2,"max":19,"singleCount":4,"singleRate":40.0,"medalTotal":60},{"name":"跨境业务二部","total":10,"avg":3.8,"median":2,"max":12,"singleCount":4,"singleRate":40.0,"medalTotal":38},{"name":"全球售业务部","total":9,"avg":6.67,"median":5,"max":15,"singleCount":0,"singleRate":0.0,"medalTotal":60},{"name":"欧洲自营业务部","total":5,"avg":2.0,"median":2,"max":4,"singleCount":2,"singleRate":40.0,"medalTotal":10},{"name":"亚太区","total":3,"avg":2.0,"median":2,"max":2,"singleCount":0,"singleRate":0.0,"medalTotal":6},{"name":"技术产品部","total":3,"avg":2.33,"median":3,"max":3,"singleCount":1,"singleRate":33.3,"medalTotal":7},{"name":"中东区","total":2,"avg":2.0,"median":2,"max":2,"singleCount":0,"singleRate":0.0,"medalTotal":4},{"name":"欧洲区","total":2,"avg":3.5,"median":3,"max":5,"singleCount":0,"singleRate":0.0,"medalTotal":7},{"name":"北方区","total":1,"avg":6.0,"median":6,"max":6,"singleCount":0,"singleRate":0.0,"medalTotal":6},{"name":"华东区","total":1,"avg":7.0,"median":7,"max":7,"singleCount":0,"singleRate":0.0,"medalTotal":7},{"name":"华南区","total":1,"avg":15.0,"median":15,"max":15,"singleCount":0,"singleRate":0.0,"medalTotal":15},{"name":"品牌出海部","total":1,"avg":3.0,"median":3,"max":3,"singleCount":0,"singleRate":0.0,"medalTotal":3},{"name":"美洲区","total":1,"avg":1.0,"median":1,"max":1,"singleCount":1,"singleRate":100.0,"medalTotal":1},{"name":"西南区","total":1,"avg":4.0,"median":4,"max":4,"singleCount":0,"singleRate":0.0,"medalTotal":4},{"name":"赛夫事业部","total":1,"avg":10.0,"median":10,"max":10,"singleCount":0,"singleRate":0.0,"medalTotal":10}],"roleSummary":[{"name":"助理采销岗","total":5014,"avg":12.0,"median":12,"max":30,"singleCount":115,"singleRate":2.3,"medalTotal":60145},{"name":"采销岗","total":4712,"avg":16.12,"median":17,"max":35,"singleCount":33,"singleRate":0.7,"medalTotal":75947},{"name":"采销岗(团队负责人)","total":870,"avg":14.17,"median":15,"max":26,"singleCount":9,"singleRate":1.0,"medalTotal":12331},{"name":"采销岗(组长)","total":270,"avg":12.4,"median":13,"max":18,"singleCount":2,"singleRate":0.7,"medalTotal":3348},{"name":"企业业务采销岗","total":169,"avg":5.65,"median":4,"max":17,"singleCount":7,"singleRate":4.1,"medalTotal":955},{"name":"企业业务采销岗(团队负责人)","total":23,"avg":3.3,"median":3,"max":10,"singleCount":2,"singleRate":8.7,"medalTotal":76},{"name":"采销岗(团队负责人）","total":4,"avg":13.25,"median":13,"max":18,"singleCount":0,"singleRate":0.0,"medalTotal":53},{"name":"采销岗(组长）","total":4,"avg":11.5,"median":12,"max":14,"singleCount":0,"singleRate":0.0,"medalTotal":46}],"medalDeptDist":[{"name":"66大顺","code":"GreatSuccess","total":11046,"dist":[{"dept":"家电家居事业群","count":2512},{"dept":"大商超事业群","count":2077},{"dept":"3C数码事业群","count":1338},{"dept":"大时尚事业群","count":1254},{"dept":"京喜事业部","count":907},{"dept":"创新零售事业群","count":685},{"dept":"跨境事业部","count":390},{"dept":"汽车事业部","count":305},{"dept":"集团政企业务部","count":235},{"dept":"营养保健业务部","count":212},{"dept":"医药业务部","count":203},{"dept":"工业品平台业务部","count":200},{"dept":"MRO业务部","count":174},{"dept":"自有品牌业务部","count":168},{"dept":"消费器械业务部","count":88},{"dept":"BOM业务部","count":76},{"dept":"医疗器械业务部","count":63},{"dept":"SMB业务部","count":31},{"dept":"即时零售业务部","count":23},{"dept":"本地生活服务事业群","count":17},{"dept":"跨境业务一部","count":15},{"dept":"国际商品供应链部","count":12},{"dept":"大客户部","count":11},{"dept":"跨境业务三部","count":9},{"dept":"跨境业务二部","count":10},{"dept":"全球售业务部","count":9},{"dept":"欧洲自营业务部","count":5},{"dept":"亚太区","count":3},{"dept":"技术产品部","count":3},{"dept":"中东区","count":2},{"dept":"欧洲区","count":2},{"dept":"北方区","count":1},{"dept":"华东区","count":1},{"dept":"华南区","count":1},{"dept":"品牌出海部","count":1},{"dept":"美洲区","count":1},{"dept":"西南区","count":1},{"dept":"赛夫事业部","count":1}]},{"name":"持之以恒","code":"PerfectAttendance","total":10380,"dist":[{"dept":"家电家居事业群","count":2407},{"dept":"大商超事业群","count":2038},{"dept":"3C数码事业群","count":1316},{"dept":"大时尚事业群","count":1237},{"dept":"京喜事业部","count":897},{"dept":"创新零售事业群","count":602},{"dept":"跨境事业部","count":373},{"dept":"汽车事业部","count":302},{"dept":"集团政企业务部","count":196},{"dept":"营养保健业务部","count":209},{"dept":"医药业务部","count":195},{"dept":"工业品平台业务部","count":191},{"dept":"MRO业务部","count":29},{"dept":"自有品牌业务部","count":157},{"dept":"消费器械业务部","count":87},{"dept":"BOM业务部","count":14},{"dept":"医疗器械业务部","count":62},{"dept":"SMB业务部","count":9},{"dept":"即时零售业务部","count":22},{"dept":"本地生活服务事业群","count":14},{"dept":"跨境业务一部","count":5},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":5},{"dept":"跨境业务三部","count":5},{"dept":"跨境业务二部","count":3},{"dept":"全球售业务部","count":2},{"dept":"华南区","count":1},{"dept":"赛夫事业部","count":1}]},{"name":"端午安康","code":"DragonBoatFestivalWellBeing","total":9006,"dist":[{"dept":"家电家居事业群","count":2086},{"dept":"大商超事业群","count":1723},{"dept":"3C数码事业群","count":1122},{"dept":"大时尚事业群","count":1010},{"dept":"京喜事业部","count":758},{"dept":"创新零售事业群","count":450},{"dept":"跨境事业部","count":334},{"dept":"汽车事业部","count":254},{"dept":"集团政企业务部","count":180},{"dept":"营养保健业务部","count":186},{"dept":"医药业务部","count":172},{"dept":"工业品平台业务部","count":185},{"dept":"MRO业务部","count":143},{"dept":"自有品牌业务部","count":116},{"dept":"消费器械业务部","count":71},{"dept":"BOM业务部","count":52},{"dept":"医疗器械业务部","count":56},{"dept":"SMB业务部","count":29},{"dept":"即时零售业务部","count":19},{"dept":"本地生活服务事业群","count":14},{"dept":"跨境业务一部","count":2},{"dept":"国际商品供应链部","count":9},{"dept":"大客户部","count":9},{"dept":"跨境业务三部","count":3},{"dept":"跨境业务二部","count":2},{"dept":"全球售业务部","count":9},{"dept":"欧洲自营业务部","count":1},{"dept":"亚太区","count":1},{"dept":"技术产品部","count":2},{"dept":"欧洲区","count":2},{"dept":"北方区","count":1},{"dept":"华东区","count":1},{"dept":"华南区","count":1},{"dept":"品牌出海部","count":1},{"dept":"西南区","count":1},{"dept":"赛夫事业部","count":1}]},{"name":"日积月累","code":"PioneerOfLanding","total":8675,"dist":[{"dept":"家电家居事业群","count":2082},{"dept":"大商超事业群","count":1716},{"dept":"3C数码事业群","count":1098},{"dept":"大时尚事业群","count":1024},{"dept":"京喜事业部","count":777},{"dept":"创新零售事业群","count":442},{"dept":"跨境事业部","count":323},{"dept":"汽车事业部","count":241},{"dept":"集团政企业务部","count":160},{"dept":"营养保健业务部","count":172},{"dept":"医药业务部","count":155},{"dept":"工业品平台业务部","count":180},{"dept":"MRO业务部","count":16},{"dept":"自有品牌业务部","count":111},{"dept":"消费器械业务部","count":65},{"dept":"BOM业务部","count":9},{"dept":"医疗器械业务部","count":48},{"dept":"SMB业务部","count":6},{"dept":"即时零售业务部","count":21},{"dept":"本地生活服务事业群","count":13},{"dept":"跨境业务一部","count":4},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":3},{"dept":"跨境业务三部","count":3},{"dept":"跨境业务二部","count":2},{"dept":"全球售业务部","count":2},{"dept":"华南区","count":1}]},{"name":"奋斗足迹","code":"FootprintsOfStruggle","total":8433,"dist":[{"dept":"家电家居事业群","count":1950},{"dept":"大商超事业群","count":1636},{"dept":"3C数码事业群","count":1061},{"dept":"大时尚事业群","count":968},{"dept":"京喜事业部","count":711},{"dept":"创新零售事业群","count":366},{"dept":"跨境事业部","count":319},{"dept":"汽车事业部","count":240},{"dept":"集团政企业务部","count":171},{"dept":"营养保健业务部","count":178},{"dept":"医药业务部","count":164},{"dept":"工业品平台业务部","count":181},{"dept":"MRO业务部","count":128},{"dept":"自有品牌业务部","count":110},{"dept":"消费器械业务部","count":67},{"dept":"BOM业务部","count":45},{"dept":"医疗器械业务部","count":49},{"dept":"SMB业务部","count":24},{"dept":"即时零售业务部","count":16},{"dept":"本地生活服务事业群","count":15},{"dept":"跨境业务一部","count":1},{"dept":"国际商品供应链部","count":6},{"dept":"大客户部","count":8},{"dept":"跨境业务三部","count":1},{"dept":"跨境业务二部","count":2},{"dept":"全球售业务部","count":8},{"dept":"欧洲自营业务部","count":1},{"dept":"技术产品部","count":1},{"dept":"欧洲区","count":1},{"dept":"北方区","count":1},{"dept":"华东区","count":1},{"dept":"华南区","count":1},{"dept":"西南区","count":1},{"dept":"赛夫事业部","count":1}]},{"name":"新春贺岁","code":"HappyNewYear","total":7924,"dist":[{"dept":"家电家居事业群","count":1986},{"dept":"大商超事业群","count":1548},{"dept":"3C数码事业群","count":953},{"dept":"大时尚事业群","count":893},{"dept":"京喜事业部","count":700},{"dept":"创新零售事业群","count":346},{"dept":"跨境事业部","count":283},{"dept":"汽车事业部","count":236},{"dept":"集团政企业务部","count":174},{"dept":"营养保健业务部","count":158},{"dept":"医药业务部","count":141},{"dept":"工业品平台业务部","count":170},{"dept":"MRO业务部","count":45},{"dept":"自有品牌业务部","count":102},{"dept":"消费器械业务部","count":61},{"dept":"BOM业务部","count":17},{"dept":"医疗器械业务部","count":44},{"dept":"SMB业务部","count":10},{"dept":"即时零售业务部","count":16},{"dept":"本地生活服务事业群","count":13},{"dept":"跨境业务一部","count":3},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":6},{"dept":"跨境业务三部","count":3},{"dept":"跨境业务二部","count":3},{"dept":"全球售业务部","count":8},{"dept":"北方区","count":1},{"dept":"华东区","count":1},{"dept":"华南区","count":1},{"dept":"赛夫事业部","count":1}]},{"name":"时间合伙人","code":"TimePartner","total":7112,"dist":[{"dept":"家电家居事业群","count":1751},{"dept":"大商超事业群","count":1374},{"dept":"3C数码事业群","count":843},{"dept":"大时尚事业群","count":762},{"dept":"京喜事业部","count":547},{"dept":"创新零售事业群","count":372},{"dept":"跨境事业部","count":240},{"dept":"汽车事业部","count":174},{"dept":"集团政企业务部","count":144},{"dept":"营养保健业务部","count":138},{"dept":"医药业务部","count":137},{"dept":"工业品平台业务部","count":162},{"dept":"MRO业务部","count":139},{"dept":"自有品牌业务部","count":87},{"dept":"消费器械业务部","count":50},{"dept":"BOM业务部","count":48},{"dept":"医疗器械业务部","count":39},{"dept":"SMB业务部","count":29},{"dept":"即时零售业务部","count":9},{"dept":"本地生活服务事业群","count":15},{"dept":"跨境业务一部","count":5},{"dept":"国际商品供应链部","count":11},{"dept":"大客户部","count":9},{"dept":"跨境业务三部","count":6},{"dept":"跨境业务二部","count":1},{"dept":"全球售业务部","count":6},{"dept":"欧洲自营业务部","count":3},{"dept":"亚太区","count":2},{"dept":"技术产品部","count":1},{"dept":"中东区","count":2},{"dept":"欧洲区","count":1},{"dept":"北方区","count":1},{"dept":"华东区","count":1},{"dept":"华南区","count":1},{"dept":"品牌出海部","count":1},{"dept":"西南区","count":1}]},{"name":"全域探索","code":"GlobalExploration","total":6828,"dist":[{"dept":"家电家居事业群","count":1577},{"dept":"大商超事业群","count":1281},{"dept":"3C数码事业群","count":908},{"dept":"大时尚事业群","count":792},{"dept":"京喜事业部","count":633},{"dept":"创新零售事业群","count":388},{"dept":"跨境事业部","count":250},{"dept":"汽车事业部","count":202},{"dept":"集团政企业务部","count":140},{"dept":"营养保健业务部","count":120},{"dept":"医药业务部","count":129},{"dept":"工业品平台业务部","count":104},{"dept":"MRO业务部","count":30},{"dept":"自有品牌业务部","count":108},{"dept":"消费器械业务部","count":55},{"dept":"BOM业务部","count":15},{"dept":"医疗器械业务部","count":43},{"dept":"SMB业务部","count":10},{"dept":"即时零售业务部","count":21},{"dept":"本地生活服务事业群","count":8},{"dept":"跨境业务一部","count":3},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":3},{"dept":"跨境业务三部","count":4},{"dept":"跨境业务二部","count":2},{"dept":"全球售业务部","count":1}]},{"name":"智搜达人","code":"SmartSearchExpert","total":6136,"dist":[{"dept":"家电家居事业群","count":1588},{"dept":"大商超事业群","count":1283},{"dept":"3C数码事业群","count":769},{"dept":"大时尚事业群","count":628},{"dept":"京喜事业部","count":496},{"dept":"创新零售事业群","count":217},{"dept":"跨境事业部","count":222},{"dept":"汽车事业部","count":198},{"dept":"集团政企业务部","count":106},{"dept":"营养保健业务部","count":127},{"dept":"医药业务部","count":100},{"dept":"工业品平台业务部","count":166},{"dept":"MRO业务部","count":13},{"dept":"自有品牌业务部","count":87},{"dept":"消费器械业务部","count":53},{"dept":"BOM业务部","count":5},{"dept":"医疗器械业务部","count":46},{"dept":"SMB业务部","count":5},{"dept":"即时零售业务部","count":8},{"dept":"本地生活服务事业群","count":8},{"dept":"跨境业务一部","count":2},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":2},{"dept":"跨境业务三部","count":2},{"dept":"全球售业务部","count":2},{"dept":"华南区","count":1},{"dept":"赛夫事业部","count":1}]},{"name":"灯映前程","code":"LightIlluminatingTheFuture","total":5972,"dist":[{"dept":"家电家居事业群","count":1502},{"dept":"大商超事业群","count":1186},{"dept":"3C数码事业群","count":714},{"dept":"大时尚事业群","count":725},{"dept":"京喜事业部","count":508},{"dept":"创新零售事业群","count":200},{"dept":"跨境事业部","count":212},{"dept":"汽车事业部","count":184},{"dept":"集团政企业务部","count":131},{"dept":"营养保健业务部","count":121},{"dept":"医药业务部","count":111},{"dept":"工业品平台业务部","count":154},{"dept":"MRO业务部","count":24},{"dept":"自有品牌业务部","count":71},{"dept":"消费器械业务部","count":46},{"dept":"BOM业务部","count":7},{"dept":"医疗器械业务部","count":35},{"dept":"SMB业务部","count":5},{"dept":"即时零售业务部","count":8},{"dept":"本地生活服务事业群","count":9},{"dept":"跨境业务一部","count":2},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":4},{"dept":"跨境业务三部","count":2},{"dept":"跨境业务二部","count":3},{"dept":"全球售业务部","count":5},{"dept":"华东区","count":1},{"dept":"赛夫事业部","count":1}]},{"name":"采销成长","code":"OswGrow","total":5737,"dist":[{"dept":"家电家居事业群","count":1458},{"dept":"大商超事业群","count":1147},{"dept":"3C数码事业群","count":771},{"dept":"大时尚事业群","count":671},{"dept":"京喜事业部","count":434},{"dept":"创新零售事业群","count":213},{"dept":"跨境事业部","count":208},{"dept":"汽车事业部","count":190},{"dept":"集团政企业务部","count":110},{"dept":"营养保健业务部","count":104},{"dept":"医药业务部","count":90},{"dept":"工业品平台业务部","count":129},{"dept":"MRO业务部","count":12},{"dept":"自有品牌业务部","count":81},{"dept":"消费器械业务部","count":49},{"dept":"BOM业务部","count":6},{"dept":"医疗器械业务部","count":37},{"dept":"SMB业务部","count":3},{"dept":"即时零售业务部","count":2},{"dept":"本地生活服务事业群","count":11},{"dept":"跨境业务一部","count":1},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":2},{"dept":"跨境业务三部","count":2},{"dept":"跨境业务二部","count":2},{"dept":"全球售业务部","count":1},{"dept":"华南区","count":1},{"dept":"赛夫事业部","count":1}]},{"name":"年度同行者","code":"AnnualCompanion","total":5641,"dist":[{"dept":"家电家居事业群","count":1557},{"dept":"大商超事业群","count":1137},{"dept":"3C数码事业群","count":687},{"dept":"大时尚事业群","count":665},{"dept":"京喜事业部","count":459},{"dept":"创新零售事业群","count":138},{"dept":"跨境事业部","count":201},{"dept":"汽车事业部","count":154},{"dept":"集团政企业务部","count":122},{"dept":"营养保健业务部","count":96},{"dept":"医药业务部","count":93},{"dept":"工业品平台业务部","count":149},{"dept":"MRO业务部","count":6},{"dept":"自有品牌业务部","count":66},{"dept":"消费器械业务部","count":44},{"dept":"BOM业务部","count":6},{"dept":"医疗器械业务部","count":24},{"dept":"SMB业务部","count":4},{"dept":"即时零售业务部","count":10},{"dept":"本地生活服务事业群","count":7},{"dept":"跨境业务一部","count":4},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":3},{"dept":"跨境业务三部","count":3},{"dept":"跨境业务二部","count":2},{"dept":"全球售业务部","count":2},{"dept":"华东区","count":1}]},{"name":"智驭能手","code":"IntelligentDrivingExpert","total":5630,"dist":[{"dept":"家电家居事业群","count":951},{"dept":"大商超事业群","count":1391},{"dept":"3C数码事业群","count":846},{"dept":"大时尚事业群","count":821},{"dept":"京喜事业部","count":113},{"dept":"创新零售事业群","count":194},{"dept":"跨境事业部","count":234},{"dept":"汽车事业部","count":209},{"dept":"集团政企业务部","count":152},{"dept":"营养保健业务部","count":161},{"dept":"医药业务部","count":133},{"dept":"工业品平台业务部","count":147},{"dept":"MRO业务部","count":46},{"dept":"自有品牌业务部","count":80},{"dept":"消费器械业务部","count":61},{"dept":"BOM业务部","count":18},{"dept":"医疗器械业务部","count":47},{"dept":"SMB业务部","count":7},{"dept":"即时零售业务部","count":2},{"dept":"本地生活服务事业群","count":4},{"dept":"跨境业务一部","count":2},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":5},{"dept":"跨境业务三部","count":2},{"dept":"全球售业务部","count":2},{"dept":"华南区","count":1}]},{"name":"智学先锋","code":"IntelligentLearningPioneer","total":5537,"dist":[{"dept":"家电家居事业群","count":903},{"dept":"大商超事业群","count":1410},{"dept":"3C数码事业群","count":913},{"dept":"大时尚事业群","count":856},{"dept":"京喜事业部","count":692},{"dept":"创新零售事业群","count":155},{"dept":"跨境事业部","count":270},{"dept":"汽车事业部","count":208},{"dept":"集团政企业务部","count":5},{"dept":"营养保健业务部","count":12},{"dept":"医药业务部","count":2},{"dept":"工业品平台业务部","count":3},{"dept":"自有品牌业务部","count":93},{"dept":"消费器械业务部","count":6},{"dept":"BOM业务部","count":1},{"dept":"医疗器械业务部","count":4},{"dept":"跨境业务一部","count":2},{"dept":"跨境业务三部","count":2}]},{"name":"战斗印记","code":"DoubleElevenPromotion","total":5477,"dist":[{"dept":"家电家居事业群","count":1477},{"dept":"大商超事业群","count":1087},{"dept":"3C数码事业群","count":723},{"dept":"大时尚事业群","count":598},{"dept":"京喜事业部","count":521},{"dept":"创新零售事业群","count":131},{"dept":"跨境事业部","count":176},{"dept":"汽车事业部","count":147},{"dept":"集团政企业务部","count":95},{"dept":"营养保健业务部","count":92},{"dept":"医药业务部","count":96},{"dept":"工业品平台业务部","count":148},{"dept":"MRO业务部","count":5},{"dept":"自有品牌业务部","count":65},{"dept":"消费器械业务部","count":42},{"dept":"BOM业务部","count":4},{"dept":"医疗器械业务部","count":33},{"dept":"SMB业务部","count":3},{"dept":"即时零售业务部","count":12},{"dept":"本地生活服务事业群","count":6},{"dept":"跨境业务一部","count":4},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":3},{"dept":"跨境业务三部","count":4},{"dept":"跨境业务二部","count":2},{"dept":"全球售业务部","count":1},{"dept":"华南区","count":1}]},{"name":"工具大师","code":"ToolMaster","total":5352,"dist":[{"dept":"家电家居事业群","count":1245},{"dept":"大商超事业群","count":1109},{"dept":"3C数码事业群","count":727},{"dept":"大时尚事业群","count":639},{"dept":"京喜事业部","count":380},{"dept":"创新零售事业群","count":203},{"dept":"跨境事业部","count":205},{"dept":"汽车事业部","count":169},{"dept":"集团政企业务部","count":100},{"dept":"营养保健业务部","count":113},{"dept":"医药业务部","count":126},{"dept":"工业品平台业务部","count":116},{"dept":"MRO业务部","count":33},{"dept":"自有品牌业务部","count":66},{"dept":"消费器械业务部","count":51},{"dept":"BOM业务部","count":9},{"dept":"医疗器械业务部","count":39},{"dept":"SMB业务部","count":4},{"dept":"即时零售业务部","count":4},{"dept":"本地生活服务事业群","count":8},{"dept":"大客户部","count":1},{"dept":"跨境业务三部","count":1},{"dept":"全球售业务部","count":1},{"dept":"欧洲区","count":1},{"dept":"华南区","count":1},{"dept":"赛夫事业部","count":1}]},{"name":"全域巡检官","code":"AreaInspector","total":5235,"dist":[{"dept":"家电家居事业群","count":956},{"dept":"大商超事业群","count":1406},{"dept":"3C数码事业群","count":885},{"dept":"大时尚事业群","count":679},{"dept":"京喜事业部","count":172},{"dept":"创新零售事业群","count":127},{"dept":"跨境事业部","count":240},{"dept":"汽车事业部","count":213},{"dept":"集团政企业务部","count":14},{"dept":"营养保健业务部","count":143},{"dept":"医药业务部","count":148},{"dept":"工业品平台业务部","count":77},{"dept":"MRO业务部","count":5},{"dept":"自有品牌业务部","count":52},{"dept":"消费器械业务部","count":55},{"dept":"BOM业务部","count":6},{"dept":"医疗器械业务部","count":47},{"dept":"SMB业务部","count":3},{"dept":"即时零售业务部","count":1},{"dept":"本地生活服务事业群","count":4},{"dept":"跨境业务三部","count":2}]},{"name":"超级运营","code":"SupperConnector","total":5089,"dist":[{"dept":"家电家居事业群","count":1025},{"dept":"大商超事业群","count":1180},{"dept":"3C数码事业群","count":659},{"dept":"大时尚事业群","count":596},{"dept":"京喜事业部","count":574},{"dept":"创新零售事业群","count":143},{"dept":"跨境事业部","count":158},{"dept":"汽车事业部","count":178},{"dept":"集团政企业务部","count":42},{"dept":"营养保健业务部","count":100},{"dept":"医药业务部","count":79},{"dept":"工业品平台业务部","count":167},{"dept":"MRO业务部","count":6},{"dept":"自有品牌业务部","count":76},{"dept":"消费器械业务部","count":48},{"dept":"BOM业务部","count":4},{"dept":"医疗器械业务部","count":40},{"dept":"本地生活服务事业群","count":6},{"dept":"跨境业务一部","count":2},{"dept":"国际商品供应链部","count":1},{"dept":"跨境业务三部","count":3},{"dept":"跨境业务二部","count":2}]},{"name":"运营提效师","code":"OperationsEfficiencySpecialist","total":4081,"dist":[{"dept":"家电家居事业群","count":571},{"dept":"大商超事业群","count":1065},{"dept":"3C数码事业群","count":530},{"dept":"大时尚事业群","count":668},{"dept":"京喜事业部","count":9},{"dept":"创新零售事业群","count":151},{"dept":"跨境事业部","count":203},{"dept":"汽车事业部","count":162},{"dept":"集团政企业务部","count":120},{"dept":"营养保健业务部","count":129},{"dept":"医药业务部","count":100},{"dept":"工业品平台业务部","count":132},{"dept":"MRO业务部","count":43},{"dept":"自有品牌业务部","count":74},{"dept":"消费器械业务部","count":56},{"dept":"BOM业务部","count":15},{"dept":"医疗器械业务部","count":31},{"dept":"SMB业务部","count":9},{"dept":"即时零售业务部","count":1},{"dept":"本地生活服务事业群","count":4},{"dept":"国际商品供应链部","count":1},{"dept":"大客户部","count":5},{"dept":"跨境业务三部","count":1},{"dept":"华南区","count":1}]},{"name":"分析百事通","code":"AnalyzingBaiShiTong","total":4037,"dist":[{"dept":"家电家居事业群","count":635},{"dept":"大商超事业群","count":1034},{"dept":"3C数码事业群","count":745},{"dept":"大时尚事业群","count":454},{"dept":"京喜事业部","count":276},{"dept":"创新零售事业群","count":124},{"dept":"跨境事业部","count":125},{"dept":"汽车事业部","count":150},{"dept":"集团政企业务部","count":29},{"dept":"营养保健业务部","count":114},{"dept":"医药业务部","count":100},{"dept":"工业品平台业务部","count":117},{"dept":"MRO业务部","count":3},{"dept":"自有品牌业务部","count":44},{"dept":"消费器械业务部","count":51},{"dept":"BOM业务部","count":3},{"dept":"医疗器械业务部","count":26},{"dept":"即时零售业务部","count":1},{"dept":"本地生活服务事业群","count":5},{"dept":"跨境业务一部","count":1}]}]};
+// ===== Dashboard Shared Utils =====
+const TOTAL = DATA.totalUsersWithMedals;
+const TOTAL_EMP = DATA.totalEmployees || 12487;
+const fmt = n => n.toLocaleString('zh-CN');
+const pct = (n, d) => { d = d || TOTAL_EMP; return (n / d * 100).toFixed(2) + '%'; };
+
+function getTier(count) {
+  var rate = count / TOTAL_EMP * 100;
+  if (rate === 0) return { label: '无人获得', cls: 'tier-none', color: '#5a7a95' };
+  if (rate < 10) return { label: '困难', cls: 'tier-hard', color: '#ef5350' };
+  if (rate < 30) return { label: '较难', cls: 'tier-harder', color: '#ff7043' };
+  if (rate < 60) return { label: '适中', cls: 'tier-moderate', color: '#ffa726' };
+  return { label: '简单', cls: 'tier-easy', color: '#66bb6a' };
+}
+
+function purposeBadge(p) {
+  if (!p) return '<span style="color:#5a7a95">—</span>';
+  var m = {'功能牵引类':'purpose-gongneng','学习成长类':'purpose-xuexi','生态共创类':'purpose-shengtai','场景情感类':'purpose-changjing','业务成就类':'purpose-yewu'};
+  return '<span class="type-badge ' + (m[p]||'purpose-gongneng') + '">' + p + '</span>';
+}
+function typeBadge(t) {
+  if (!t) return '<span style="color:#5a7a95">—</span>';
+  var m = {'纪念勋章':'mt-jiyu','荣誉勋章':'mt-rongyu','成长勋章':'mt-chengzhang','限定勋章':'mt-xianding','新人成就':'mt-xinren'};
+  return '<span class="type-badge ' + (m[t]||'') + '">' + t + '</span>';
+}
+function attrBadge(a) {
+  if (!a) return '<span style="color:#5a7a95">—</span>';
+  if (a.indexOf('非升级') >= 0) return '<span class="type-badge attr-fixed">非升级</span>';
+  if (a.indexOf('升级') >= 0) return '<span class="type-badge attr-upgrade">升级</span>';
+  return '<span style="color:#5a7a95">—</span>';
+}
+
+// ===== KPI =====
+var kpis = [
+  { label: '采销岗总人数', value: fmt(TOTAL_EMP), unit: '在职采销岗员工', cls: 'highlight' },
+  { label: '有勋章人数', value: fmt(TOTAL), unit: '覆盖率' + pct(TOTAL), cls: 'success' },
+  { label: '勋章覆盖率', value: pct(TOTAL).replace('%',''), unit: '%采销岗员工有勋章', cls: 'gold' },
+  { label: '人均勋章数', value: DATA.avgMedals, unit: '全员均值5.30', cls: 'warning' },
+  { label: '中位数', value: DATA.medianMedals, unit: '枚勋章', cls: 'info' },
+  { label: '升级勋章', value: DATA.attrBreakdown['升级勋章']||0, unit: '种 / 非升级' + (DATA.attrBreakdown['非升级勋章']||0) + '种', cls: 'rose' },
+  { label: '功能牵引类', value: DATA.purposeBreakdown['功能牵引类']||0, unit: '种（占比最大）', cls: 'cyan' }
+];
+document.getElementById('kpiGrid').innerHTML = kpis.map(function(k) {
+  return '<div class="kpi-card ' + k.cls + '">' +
+    '<div class="label">' + k.label + '</div>' +
+    '<div class="value">' + k.value + '</div>' +
+    '<div class="unit">' + k.unit + '</div>' +
+  '</div>';
+}).join('');
+
+// ===== INSIGHTS =====
+var dTierCount = DATA.medals.filter(function(m) { return m.count / TOTAL_EMP * 100 === 0; }).length;
+var hardCount = DATA.medals.filter(function(m) { var r = m.count / TOTAL_EMP * 100; return r > 0 && r < 10; }).length;
+var singleMedalPct = (DATA.distribution.find(function(d) { return d.count === 1; }).users / TOTAL * 100).toFixed(1);
+var singleMedalUsers = DATA.distribution.find(function(d) { return d.count === 1; }).users;
+var highMedalUsers = DATA.ranges.filter(function(r) { return ['16-20枚','21-25枚','26枚以上'].indexOf(r.label) >= 0; }).reduce(function(s,r) { return s + r.count; }, 0);
+var lowMedalUsers = DATA.ranges.filter(function(r) { return ['1枚','2-3枚'].indexOf(r.label) >= 0; }).reduce(function(s,r) { return s + r.count; }, 0);
+
+var insights = [
+  { title: '🔑 采销岗是勋章"达人"群体',
+    text: '采销岗总人数 <span class="hl">' + fmt(TOTAL_EMP) + '</span> 人，其中 <span class="hl">' + fmt(TOTAL) + '</span> 人有勋章（覆盖率 <span class="hl">' + pct(TOTAL) + '</span>）。人均 <span class="hl">' + DATA.avgMedals + '</span> 枚勋章，远超全员均值 <span class="hl">5.30</span> 枚，是全员的 <span class="hl">' + (DATA.avgMedals/5.30).toFixed(1) + '倍</span>。中位数 <span class="hl">' + DATA.medianMedals + '</span> 枚（vs 全员 <span class="hl">3</span> 枚），最高 <span class="hl">' + DATA.maxMedals + '</span> 枚。' },
+  { title: '📊 持有量分布特征',
+    text: '采销岗仅 <span class="hl">' + singleMedalPct + '%</span> 的用户仅持1枚（vs 全员28.5%），1-3枚用户合计仅 <span class="hl">' + (lowMedalUsers/TOTAL*100).toFixed(1) + '%</span>。大部分采销岗员工集中在11-20枚区间（<span class="hl">' + fmt(DATA.ranges.filter(function(r){return ['11-15枚','16-20枚'].indexOf(r.label)>=0}).reduce(function(s,r){return s+r.count},0)) + '</span> 人），分布呈牛峰型而非长尾型。' },
+  { title: '🏷️ 维度洞察',
+    text: '功能牵引类 <span class="hl">' + (DATA.purposeBreakdown['功能牵引类']||0) + '</span> 种最多，采销岗获得人次 <span class="hl">' + fmt(DATA.purposeUserCounts['功能牵引类']||0) + '</span>；场景情感类 <span class="hl">' + (DATA.purposeBreakdown['场景情感类']||0) + '</span> 种但人次最高 <span class="hl">' + fmt(DATA.purposeUserCounts['场景情感类']||0) + '</span>。升级勋章 <span class="hl">' + (DATA.attrBreakdown['升级勋章']||0) + '</span> 种 vs 非升级 <span class="hl">' + (DATA.attrBreakdown['非升级勋章']||0) + '</span> 种。' },
+  { title: '⚠️ 体系风险与特色',
+    text: '无人获得 <span class="hl">' + dTierCount + '</span> 种、困难 <span class="hl">' + hardCount + '</span> 种勋章获得率极低。采销岗特有"勤学善思"勋章覆盖率 <span class="hl">' + (DATA.medals.find(function(m){return m.code==="OswGrow"}).count/TOTAL_EMP*100).toFixed(1) + '%</span>，但企业业务采销岗仅 <span class="hl">' + (167/TOTAL_EMP*100).toFixed(1) + '%</span>，岗位内部差异显著。且"感恩共建"等采销岗专属勋章仍是白名单模式，应扩大覆盖。' }
+];
+document.getElementById('insights').innerHTML = insights.map(function(i) {
+  return '<div class="insight-box"><div class="insight-title">' + i.title + '</div><div class="insight-text">' + i.text + '</div></div>';
+}).join('');
+
+// ===== CLASSIFICATION OVERVIEW =====
+var classData = [
+  { name: '功能牵引类', icon: '🎯', color: '#66bb6a',
+    desc: '围绕业务功能使用发放，通过勋章引导用户体验和使用重点功能。如AI功能、权限等，主要目的为提升功能渗透率、验证业务价值。',
+    count: DATA.purposeBreakdown['功能牵引类']||0, userCount: DATA.purposeUserCounts['功能牵引类']||0,
+    types: DATA.medals.filter(function(m){return m.purpose==='功能牵引类'}).reduce(function(acc,m){var t=m.medal_type;if(!acc[t])acc[t]=0;acc[t]++;return acc;},{}),
+    attrSplit: DATA.medals.filter(function(m){return m.purpose==='功能牵引类'}).reduce(function(acc,m){var a=m.attribute==='升级勋章'?'升级':'非升级';if(!acc[a])acc[a]=0;acc[a]++;return acc;},{}),
+    top3: DATA.medals.filter(function(m){return m.purpose==='功能牵引类'}).sort(function(a,b){return b.count-a.count}).slice(0,3).map(function(m){return m.name}),
+    avgPerMedal: Math.round((DATA.purposeUserCounts['功能牵引类']||0)/(DATA.purposeBreakdown['功能牵引类']||1)) },
+  { name: '场景情感类', icon: '💝', color: '#f06292',
+    desc: '通过稀缺性与专属感设计，提供差异化情绪价值。节日纪念、年度荣誉等，登录/在职即可获取，覆盖面最广。',
+    count: DATA.purposeBreakdown['场景情感类']||0, userCount: DATA.purposeUserCounts['场景情感类']||0,
+    types: DATA.medals.filter(function(m){return m.purpose==='场景情感类'}).reduce(function(acc,m){var t=m.medal_type;if(!acc[t])acc[t]=0;acc[t]++;return acc;},{}),
+    attrSplit: DATA.medals.filter(function(m){return m.purpose==='场景情感类'}).reduce(function(acc,m){var a=m.attribute==='升级勋章'?'升级':'非升级';if(!acc[a])acc[a]=0;acc[a]++;return acc;},{}),
+    top3: DATA.medals.filter(function(m){return m.purpose==='场景情感类'}).sort(function(a,b){return b.count-a.count}).slice(0,3).map(function(m){return m.name}),
+    avgPerMedal: Math.round((DATA.purposeUserCounts['场景情感类']||0)/(DATA.purposeBreakdown['场景情感类']||1)) },
+  { name: '学习成长类', icon: '📚', color: '#4fc3f7',
+    desc: '构建清晰的能力进阶路径，量化学习成果，牵引用户深度探索。涵盖线上培训、线下分享等学习场景。',
+    count: DATA.purposeBreakdown['学习成长类']||0, userCount: DATA.purposeUserCounts['学习成长类']||0,
+    types: DATA.medals.filter(function(m){return m.purpose==='学习成长类'}).reduce(function(acc,m){var t=m.medal_type;if(!acc[t])acc[t]=0;acc[t]++;return acc;},{}),
+    attrSplit: DATA.medals.filter(function(m){return m.purpose==='学习成长类'}).reduce(function(acc,m){var a=m.attribute==='升级勋章'?'升级':'非升级';if(!acc[a])acc[a]=0;acc[a]++;return acc;},{}),
+    top3: DATA.medals.filter(function(m){return m.purpose==='学习成长类'}).sort(function(a,b){return b.count-a.count}).slice(0,3).map(function(m){return m.name}),
+    avgPerMedal: Math.round((DATA.purposeUserCounts['学习成长类']||0)/(DATA.purposeBreakdown['学习成长类']||1)) },
+  { name: '生态共创类', icon: '🌱', color: '#ffa726',
+    desc: '激励内容生产与社交传播，促进社区互动。多为白名单/限定勋章，覆盖面低但代表特殊身份。',
+    count: DATA.purposeBreakdown['生态共创类']||0, userCount: DATA.purposeUserCounts['生态共创类']||0,
+    types: DATA.medals.filter(function(m){return m.purpose==='生态共创类'}).reduce(function(acc,m){var t=m.medal_type;if(!acc[t])acc[t]=0;acc[t]++;return acc;},{}),
+    attrSplit: DATA.medals.filter(function(m){return m.purpose==='生态共创类'}).reduce(function(acc,m){var a=m.attribute==='升级勋章'?'升级':'非升级';if(!acc[a])acc[a]=0;acc[a]++;return acc;},{}),
+    top3: DATA.medals.filter(function(m){return m.purpose==='生态共创类'}).sort(function(a,b){return b.count-a.count}).slice(0,3).map(function(m){return m.name}),
+    avgPerMedal: Math.round((DATA.purposeUserCounts['生态共创类']||0)/(DATA.purposeBreakdown['生态共创类']||1)) }
+];
+var classHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+classData.forEach(function(c) {
+  var typeBadges = Object.keys(c.types).map(function(t){return '<span class="type-badge '+(t==='荣誉勋章'?'mt-rongyu':t==='纪念勋章'?'mt-jiyu':t==='成长勋章'?'mt-chengzhang':'mt-xianding')+'">'+t+' '+c.types[t]+'</span>';}).join(' ');
+  var attrBadges = Object.keys(c.attrSplit).map(function(a){return '<span class="type-badge '+(a==='升级'?'attr-upgrade':'attr-fixed')+'">'+a+' '+c.attrSplit[a]+'</span>';}).join(' ');
+  classHtml += '<div style="background:linear-gradient(145deg,#162636,#1a3044);border:1px solid #2a4a6a;border-radius:12px;padding:20px;transition:transform 0.2s" onmouseenter="this.style.transform=\'translateY(-2px)\'" onmouseleave="this.style.transform=\'\'">';
+  classHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="width:42px;height:42px;border-radius:10px;background:'+c.color+'18;border:1px solid '+c.color+'44;display:flex;align-items:center;justify-content:center;font-size:22px">'+c.icon+'</div><div style="flex:1"><div style="font-size:16px;font-weight:700;color:'+c.color+'">'+c.name+'</div><div style="font-size:11px;color:#5a7a95">'+c.count+'种勋章 · '+fmt(c.userCount)+' 人次 · 均枚'+fmt(c.avgPerMedal)+'人</div></div></div>';
+  classHtml += '<div style="font-size:12px;color:#8aabb5;line-height:1.7;margin-bottom:14px;padding:10px 12px;background:rgba(15,25,35,0.5);border-radius:8px">'+c.desc+'</div>';
+  classHtml += '<div style="margin-bottom:10px"><div style="font-size:11px;color:#5a7a95;margin-bottom:6px">勋章类型分布</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+typeBadges+'</div></div>';
+  classHtml += '<div style="margin-bottom:10px"><div style="font-size:11px;color:#5a7a95;margin-bottom:6px">升级属性</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+attrBadges+'</div></div>';
+  classHtml += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e3550"><div style="font-size:11px;color:#5a7a95;margin-bottom:6px">TOP3 勋章</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+  c.top3.forEach(function(name, idx) {
+    var medal = DATA.medals.find(function(m){return m.name===name});
+    var rate = medal ? (medal.count / TOTAL_EMP * 100).toFixed(1) : '—';
+    classHtml += '<div style="background:rgba(15,25,35,0.6);border:1px solid '+c.color+'33;border-radius:8px;padding:6px 10px;font-size:12px"><span style="color:#e0e6ed;font-weight:600">'+(idx+1)+'. '+name+'</span><span style="color:'+c.color+';margin-left:6px">'+rate+'%</span></div>';
+  });
+  classHtml += '</div></div></div>';
+});
+classHtml += '</div>';
+document.getElementById('classOverview').innerHTML = classHtml;
+
+// ===== USER DISTRIBUTION (only curve, no bar chart) =====
+var distHL = [
+  { label: '仅1枚勋章', value: fmt(singleMedalUsers), sub: '占 ' + singleMedalPct + '%', color: '#ef5350' },
+  { label: '2-3枚', value: fmt(DATA.ranges.find(function(r){return r.label==='2-3枚'}).count), sub: '占 ' + (DATA.ranges.find(function(r){return r.label==='2-3枚'}).count/TOTAL*100).toFixed(1) + '%', color: '#ffa726' },
+  { label: '4-10枚（腰部）', value: fmt(DATA.ranges.filter(function(r){return ['4-5枚','6-10枚'].indexOf(r.label)>=0}).reduce(function(s,r){return s+r.count},0)), sub: '核心进阶区间', color: '#4fc3f7' },
+  { label: '11-20枚（资深）', value: fmt(DATA.ranges.filter(function(r){return ['11-15枚','16-20枚'].indexOf(r.label)>=0}).reduce(function(s,r){return s+r.count},0)), sub: '高频活跃用户', color: '#66bb6a' },
+  { label: '21枚以上（达人）', value: fmt(DATA.ranges.filter(function(r){return ['21-25枚','26枚以上'].indexOf(r.label)>=0}).reduce(function(s,r){return s+r.count},0)), sub: '勋章收藏家', color: '#ab47bc' }
+];
+// 动态设置分布图副标题（避免硬编码数字）
+document.getElementById('distSubtitle').textContent = fmt(TOTAL) + ' 名有勋章采销岗员工的持有数量分布  ·  可获勋章 ' + DATA.uniqueMedals + ' 种  ·  中位数 ' + DATA.medianMedals + ' 枚  ·  最高 ' + DATA.maxMedals + ' 枚';
+
+document.getElementById('distHighlight').innerHTML = distHL.map(function(d) {
+  return '<div class="dist-card"><div class="dist-label">' + d.label + '</div><div class="dist-value" style="color:' + d.color + '">' + d.value + '</div><div class="dist-sub">' + d.sub + '</div></div>';
+}).join('');
+
+var distChartData = DATA.distribution.filter(function(d) { return d.users > 0; });
+new Chart(document.getElementById('chartUserDistCurve'), {
+  type: 'line',
+  data: {
+    labels: distChartData.map(function(d) { return d.count + '枚'; }),
+    datasets: [{
+      label: '人数',
+      data: distChartData.map(function(d) { return d.users; }),
+      borderColor: '#26c6da',
+      backgroundColor: function(context) {
+        var chart = context.chart; var ctx2 = chart.ctx; var area = chart.chartArea;
+        if (!area) return 'rgba(38,198,218,0.1)';
+        var gradient = ctx2.createLinearGradient(0, area.top, 0, area.bottom);
+        gradient.addColorStop(0, 'rgba(38,198,218,0.35)');
+        gradient.addColorStop(0.5, 'rgba(38,198,218,0.12)');
+        gradient.addColorStop(1, 'rgba(38,198,218,0.02)');
+        return gradient;
+      },
+      fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
+      pointBackgroundColor: '#26c6da', pointBorderColor: '#162636', pointBorderWidth: 2, borderWidth: 2.5
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    layout: { padding: { top: 8, bottom: 4 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: function(ctx) { return fmt(ctx.raw) + ' 人 (' + (ctx.raw / TOTAL * 100).toFixed(1) + '%)'; } } }
+    },
+    scales: {
+      x: { grid: { color: '#1e3550' }, title: { display: true, text: '持有勋章数量', color: '#c8dce8', font: { size: 14, weight: '600' } }, ticks: { color: '#9cc5dc', font: { size: 13 }, maxRotation: 0, autoSkip: true, autoSkipPadding: 12 } },
+      y: { grid: { color: '#1e3550' }, title: { display: true, text: '用户人数', color: '#c8dce8', font: { size: 14, weight: '600' } }, beginAtZero: true, ticks: { color: '#9cc5dc', font: { size: 13 } } }
+    }
+  }
+});
+
+// Distribution conclusions
+var r11_20 = DATA.ranges.filter(function(r){return ['11-15枚','16-20枚'].indexOf(r.label)>=0}).reduce(function(s,r){return s+r.count},0);
+var r11_20_pct = (r11_20 / TOTAL * 100).toFixed(1);
+var peakItem = DATA.distribution.reduce(function(a,b){return a.users>b.users?a:b});
+var r1_20 = DATA.ranges.filter(function(r){return ['1枚','2-3枚','4-5枚','6-10枚','11-15枚','16-20枚'].indexOf(r.label)>=0}).reduce(function(s,r){return s+r.count},0);
+var r1_20_pct = (r1_20 / TOTAL * 100).toFixed(1);
+var rUnder10 = DATA.ranges.filter(function(r){return ['1枚','2-3枚','4-5枚','6-10枚'].indexOf(r.label)>=0}).reduce(function(s,r){return s+r.count},0);
+var rUnder10_pct = (rUnder10 / TOTAL * 100).toFixed(1);
+var r25plus = DATA.distribution.filter(function(d){return d.count>=25}).reduce(function(s,d){return s+d.users},0);
+var distConclusions = [
+  { tag: '核心发现', tagColor: '#ffa726', text: '分布高度集中，<b>' + r11_20_pct + '% 的用户集中在 11-20 枚</b>。峰值出现在 ' + peakItem.count + ' 枚（' + peakItem.users + ' 人），整体呈典型牛峰型。' },
+  { tag: '关键问题', tagColor: '#ef5350', text: '天花板偏低——' + DATA.uniqueMedals + ' 种勋章中最高仅 ' + DATA.maxMedals + ' 枚，中位数仅 ' + DATA.medianMedals + ' 枚。即便最活跃的用户也只拿到了 ' + (DATA.maxMedals/DATA.uniqueMedals*100).toFixed(0) + '% 的勋章，一半的采销岗员工持有量不足可获勋章的 <b>' + (DATA.medianMedals/DATA.uniqueMedals*100).toFixed(0) + '%</b>。' },
+  { tag: '分布特征', tagColor: '#4fc3f7', text: '前紧后松——1-20 枚覆盖 ' + r1_20_pct + '% 的用户，20 枚是明显增长断点；25 枚以上仅 ' + r25plus + ' 人。' + rUnder10_pct + '% 的用户不足 10 枚，与主体差距明显。' }
+];
+document.getElementById('distConclusions').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">' + distConclusions.map(function(c) {
+  return '<div style="background:rgba(255,167,38,0.05);border:1px solid rgba(255,167,38,0.12);border-radius:10px;padding:14px 16px"><div style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;margin-bottom:8px;background:rgba(255,167,38,0.12);color:'+c.tagColor+'">'+c.tag+'</div><div style="font-size:13px;color:#b0d4f1;line-height:1.8">'+c.text+'</div></div>';
+}).join('') + '</div>';
+
+// ===== DIMENSION OVERVIEW =====
+var purposeColors = {'功能牵引类':'#66bb6a','学习成长类':'#4fc3f7','生态共创类':'#ffa726','场景情感类':'#f06292','业务成就类':'#ab47bc'};
+var dimHtml = '';
+var pbKeys = Object.keys(DATA.purposeBreakdown);
+for (var i = 0; i < pbKeys.length; i++) { var p = pbKeys[i]; var cnt = DATA.purposeBreakdown[p]; var uc = DATA.purposeUserCounts[p]||0; dimHtml += '<div class="dim-stat"><div class="dim-label">'+p+'</div><div class="dim-value">'+cnt+'</div><div class="dim-sub">种 · '+fmt(uc)+' 人次</div></div>'; }
+document.getElementById('dimStats').innerHTML = dimHtml;
+
+var doughnutLabelPlugin = {
+  id: 'doughnutLabels',
+  afterDraw: function(chart) {
+    var ctx = chart.ctx; var meta = chart.getDatasetMeta(0);
+    var total = chart.data.datasets[0].data.reduce(function(a,b){return a+b},0);
+    var data = chart.data.datasets[0].data;
+    meta.data.forEach(function(arc, i) {
+      var midAngle = (arc.startAngle + arc.endAngle) / 2;
+      var p = (data[i] / total * 100).toFixed(1);
+      if (p < 5) return;
+      var outerR = arc.outerRadius; var innerR = arc.innerRadius; var midR = (outerR + innerR) / 2;
+      var x = arc.x + Math.cos(midAngle) * midR; var y = arc.y + Math.sin(midAngle) * midR;
+      ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 12px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 3;
+      ctx.fillText(data[i] + '种', x, y - 7);
+      ctx.font = '11px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillText(p + '%', x, y + 8);
+      ctx.restore();
+    });
+  }
+};
+
+var pLabels = Object.keys(DATA.purposeBreakdown); var pTotal = pLabels.reduce(function(s,l){return s+DATA.purposeBreakdown[l]},0);
+new Chart(document.getElementById('chartPurpose'), { type: 'doughnut', plugins: [doughnutLabelPlugin], data: { labels: pLabels.map(function(l){return l+' '+DATA.purposeBreakdown[l]+'种 ('+(DATA.purposeBreakdown[l]/pTotal*100).toFixed(1)+'%)';}), datasets: [{data:pLabels.map(function(l){return DATA.purposeBreakdown[l]}),backgroundColor:pLabels.map(function(l){return(purposeColors[l]||'#888')+'cc'}),borderColor:'#1a2a3a',borderWidth:2.5,hoverOffset:6}] }, options: { responsive:true, maintainAspectRatio:true, cutout:'42%', plugins: { legend:{position:'bottom',labels:{padding:10,usePointStyle:true,pointStyleWidth:10,font:{size:12},color:'#c8dce8'}}, title:{display:true,text:'按目的类型（种类数）',color:'#c8dce8',font:{size:14,weight:'600'},padding:{bottom:12}} } } });
+
+var tLabels = Object.keys(DATA.typeBreakdown); var tColors = ['#ffd700','#4fc3f7','#66bb6a','#ab47bc','#26c6da']; var tTotal = tLabels.reduce(function(s,l){return s+DATA.typeBreakdown[l]},0);
+new Chart(document.getElementById('chartType'), { type: 'doughnut', plugins: [doughnutLabelPlugin], data: { labels: tLabels.map(function(l){return l+' '+DATA.typeBreakdown[l]+'种 ('+(DATA.typeBreakdown[l]/tTotal*100).toFixed(1)+'%)';}), datasets: [{data:tLabels.map(function(l){return DATA.typeBreakdown[l]}),backgroundColor:tColors.slice(0,tLabels.length),borderColor:'#1a2a3a',borderWidth:2.5,hoverOffset:6}] }, options: { responsive:true, maintainAspectRatio:true, cutout:'42%', plugins: { legend:{position:'bottom',labels:{padding:8,usePointStyle:true,pointStyleWidth:10,font:{size:11},color:'#c8dce8'}}, title:{display:true,text:'按勋章类型（种类数）',color:'#c8dce8',font:{size:14,weight:'600'},padding:{bottom:12}} } } });
+
+var aLabels = Object.keys(DATA.attrBreakdown); var aTotal = aLabels.reduce(function(s,l){return s+DATA.attrBreakdown[l]},0);
+new Chart(document.getElementById('chartAttr'), { type: 'doughnut', plugins: [doughnutLabelPlugin], data: { labels: aLabels.map(function(l){return l+' '+DATA.attrBreakdown[l]+'种 ('+(DATA.attrBreakdown[l]/aTotal*100).toFixed(1)+'%)';}), datasets: [{data:aLabels.map(function(l){return DATA.attrBreakdown[l]}),backgroundColor:['rgba(171,71,188,0.8)','rgba(78,182,154,0.8)'],borderColor:'#1a2a3a',borderWidth:2.5,hoverOffset:6}] }, options: { responsive:true, maintainAspectRatio:true, cutout:'42%', plugins: { legend:{position:'bottom',labels:{padding:10,usePointStyle:true,pointStyleWidth:10,font:{size:12},color:'#c8dce8'}}, title:{display:true,text:'按勋章属性（种类数）',color:'#c8dce8',font:{size:14,weight:'600'},padding:{bottom:12}} } } });
+
+// ===== MEDAL TABLE =====
+var maxCount = DATA.medals[0].count; var sortField = 'count', sortAsc = false, filterPurpose = '', filterType = '';
+function renderTable() {
+  var filtered = DATA.medals;
+  if (filterPurpose) filtered = filtered.filter(function(m) { return m.purpose === filterPurpose; });
+  if (filterType) filtered = filtered.filter(function(m) { return m.medal_type === filterType; });
+  var sorted = filtered.slice().sort(function(a, b) {
+    if (sortField === 'name') return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+    if (sortField === 'purpose') return sortAsc ? (a.purpose||'').localeCompare(b.purpose||'') : (b.purpose||'').localeCompare(a.purpose||'');
+    if (sortField === 'type') return sortAsc ? (a.medal_type||'').localeCompare(b.medal_type||'') : (b.medal_type||'').localeCompare(a.medal_type||'');
+    return sortAsc ? a.count - b.count : b.count - a.count;
+  });
+  document.getElementById('medalTable').innerHTML = sorted.map(function(m, i) {
+    var tier = getTier(m.count); var barW = m.count / maxCount * 100;
+    var rankCls = i < 1 ? 'rank-top1' : i < 2 ? 'rank-top2' : i < 3 ? 'rank-top3' : '';
+    return '<tr><td class="rank '+rankCls+'">'+(i+1)+'</td><td class="medal-name">'+m.name+'</td><td>'+purposeBadge(m.purpose)+'</td><td>'+typeBadge(m.medal_type)+'</td><td>'+attrBadge(m.attribute)+'</td><td class="count">'+fmt(m.count)+'</td><td class="pct" style="color:'+tier.color+';font-weight:600">'+pct(m.count)+'</td><td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:'+barW+'%;background:'+tier.color+'"></div></div></td><td><span class="tier-badge '+tier.cls+'">'+tier.label+'</span></td></tr>';
+  }).join('');
+}
+var sortOptions = [{field:'count',label:'按人数'},{field:'name',label:'按名称'},{field:'purpose',label:'按目的'},{field:'type',label:'按类型'}];
+var pFilterOpts = [''].concat(Object.keys(DATA.purposeBreakdown));
+var tFilterOpts = [''].concat(Object.keys(DATA.typeBreakdown));
+document.getElementById('sortBtns').innerHTML = sortOptions.map(function(s){return '<button class="sort-btn'+(s.field===sortField?' active':'')+'" data-field="'+s.field+'">'+s.label+'</button>';}).join('') + '<button class="sort-btn" id="sortDirBtn">倒序 ↕</button>' + '<span class="filter-label" style="margin-left:12px">目的：</span>' + pFilterOpts.map(function(p){return '<button class="sort-btn'+(p===filterPurpose?' active':'')+'" data-purpose="'+p+'">'+(p||'全部')+'</button>';}).join('') + '<span class="filter-label" style="margin-left:8px">类型：</span>' + tFilterOpts.map(function(t){return '<button class="sort-btn'+(t===filterType?' active':'')+'" data-type="'+t+'">'+(t||'全部')+'</button>';}).join('');
+document.querySelectorAll('.sort-btn[data-field]').forEach(function(btn){btn.addEventListener('click',function(){sortField=btn.dataset.field;document.querySelectorAll('.sort-btn[data-field]').forEach(function(b){b.classList.remove('active')});btn.classList.add('active');renderTable();});});
+document.getElementById('sortDirBtn').addEventListener('click',function(){sortAsc=!sortAsc;document.getElementById('sortDirBtn').textContent=sortAsc?'正序 ↕':'倒序 ↕';renderTable();});
+document.querySelectorAll('.sort-btn[data-purpose]').forEach(function(btn){btn.addEventListener('click',function(){filterPurpose=btn.dataset.purpose;document.querySelectorAll('.sort-btn[data-purpose]').forEach(function(b){b.classList.remove('active')});btn.classList.add('active');renderTable();});});
+document.querySelectorAll('.sort-btn[data-type]').forEach(function(btn){btn.addEventListener('click',function(){filterType=btn.dataset.type;document.querySelectorAll('.sort-btn[data-type]').forEach(function(b){b.classList.remove('active')});btn.classList.add('active');renderTable();});});
+renderTable();
+
+// ===== MEDAL CONDITIONS =====
+var condPanelOpen = false;
+function toggleCondPanel() {
+  condPanelOpen = !condPanelOpen;
+  var panel = document.getElementById('condPanel'); var icon = document.getElementById('condToggleIcon');
+  if (condPanelOpen) { panel.style.maxHeight = panel.scrollHeight + 'px'; icon.style.transform = 'rotate(180deg)'; icon.style.color = '#ffa726'; }
+  else { panel.style.maxHeight = '0'; icon.style.transform = 'rotate(0deg)'; icon.style.color = '#7a9bb5'; }
+}
+function parseUpgradeLevels(rule) {
+  if (!rule) return null; var lines = rule.split('\n').filter(function(l){return l.trim();}); if (lines.length < 2) return null;
+  var levels = {};
+  lines.forEach(function(line) { var gm = line.match(/(.+?)获得金勋章/); var sm = line.match(/(.+?)获得银勋章/); var bm = line.match(/(.+?)获得铜勋章/); if(gm)levels.gold=gm[1].trim();else if(sm)levels.silver=sm[1].trim();else if(bm)levels.bronze=bm[1].trim(); });
+  return (levels.gold||levels.silver||levels.bronze)?levels:null;
+}
+var periodGroups = {}; var periodOrder = [];
+DATA.medals.forEach(function(m){var period=m.period||'未分类';if(!periodGroups[period]){periodGroups[period]=[];periodOrder.push(period);}periodGroups[period].push(m);});
+var periodSortMap = {'2025年勋章':0,'2026年一月勋章':1,'2026年二月勋章':2,'2026年三月勋章':3,'2016年四月勋章':4,'2026年四月勋章':4,'2026年五月勋章':5,'2026年六月勋章':6};
+periodOrder.sort(function(a,b){return(periodSortMap[a]!==undefined?periodSortMap[a]:99)-(periodSortMap[b]!==undefined?periodSortMap[b]:99);});
+var condFilter = '';
+var condFilters = [{key:'',label:'全部'},{key:'升级',label:'升级勋章'},{key:'非升级',label:'非升级勋章'},{key:'白名单',label:'白名单/限定'},{key:'功能牵引类',label:'功能牵引类'},{key:'场景情感类',label:'场景情感类'},{key:'学习成长类',label:'学习成长类'},{key:'生态共创类',label:'生态共创类'}];
+document.getElementById('condSortBtns').innerHTML = '<span class="filter-label">筛选：</span>' + condFilters.map(function(f){return '<button class="sort-btn'+(f.key===condFilter?' active':'')+'" data-cond-filter="'+f.key+'">'+f.label+'</button>';}).join('');
+document.querySelectorAll('[data-cond-filter]').forEach(function(btn){btn.addEventListener('click',function(){condFilter=btn.dataset.condFilter;document.querySelectorAll('[data-cond-filter]').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');renderCondGrid();});});
+
+function renderCondGrid() {
+  var html = '';
+  periodOrder.forEach(function(period) {
+    var medals = periodGroups[period];
+    if (condFilter) { medals = medals.filter(function(m) { if(condFilter==='升级')return m.attribute==='升级勋章'; if(condFilter==='非升级')return m.attribute==='非升级勋章'; if(condFilter==='白名单')return(m.rule&&m.rule.indexOf('白名单')>=0)||m.medal_type==='限定勋章'; return m.purpose===condFilter; }); }
+    if (medals.length === 0) return;
+    var periodLabel = period.replace('2016年','2026年');
+    html += '<div style="margin-bottom:8px;margin-top:20px"><div style="display:inline-block;padding:4px 14px;border-radius:16px;font-size:13px;font-weight:600;background:rgba(171,71,188,0.15);color:#ab47bc;border:1px solid rgba(171,71,188,0.3)">'+periodLabel+'</div><span style="font-size:12px;color:#5a7a95;margin-left:8px">'+medals.length+'种勋章</span></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-bottom:16px">';
+    medals.forEach(function(m) {
+      var tier = getTier(m.count); var isUpgrade = m.attribute==='升级勋章'; var isWhitelist = m.rule&&m.rule.indexOf('白名单')>=0; var isLimited = m.medal_type==='限定勋章'; var isC2 = m.rule&&m.rule.indexOf('C2')>=0;
+      var levels = isUpgrade?parseUpgradeLevels(m.rule):null; var rate = (m.count/TOTAL_EMP*100); var rateStr = rate.toFixed(1);
+      html += '<div style="background:linear-gradient(145deg,#162636,#1a3044);border:1px solid #2a4a6a;border-radius:12px;padding:16px;transition:transform 0.2s,box-shadow 0.2s;cursor:default" onmouseenter="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 6px 20px rgba(255,167,38,0.12)\'" onmouseleave="this.style.transform=\'\';this.style.boxShadow=\'\'">';
+      html += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700;color:#e0e6ed;margin-bottom:6px">'+m.name+'</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+purposeBadge(m.purpose)+typeBadge(m.medal_type)+attrBadge(m.attribute);
+      if(isWhitelist||isLimited) html += '<span class="type-badge" style="background:rgba(171,71,188,0.15);color:#ab47bc">白名单</span>';
+      if(isC2) html += '<span class="type-badge" style="background:rgba(38,198,218,0.15);color:#26c6da">C2发放</span>';
+      html += '</div></div>';
+      var rateColor = rate>=30?'#ffd700':rate>=10?'#4fc3f7':rate>=3?'#66bb6a':rate>=0.5?'#ffa726':'#ab47bc';
+      html += '<div style="text-align:right;flex-shrink:0"><div style="font-size:20px;font-weight:700;color:'+rateColor+'">'+rateStr+'%</div><div style="font-size:10px;color:#5a7a95">'+fmt(m.count)+'人</div><div style="margin-top:2px"><span class="tier-badge '+tier.cls+'">'+tier.label+'</span></div></div></div>';
+      if(isUpgrade&&levels) {
+        html += '<div style="background:rgba(15,25,35,0.6);border-radius:8px;padding:10px 12px;margin-bottom:8px"><div style="font-size:11px;color:#7a9bb5;margin-bottom:8px;letter-spacing:1px">升级路径</div>';
+        if(levels.bronze) html += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px"><span style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#cd7f32,#b87333);display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(205,127,50,0.3)">🥉</span><div style="flex:1;padding-top:3px"><div style="font-size:10px;color:#cd7f32;font-weight:600;margin-bottom:2px">铜勋章</div><div style="font-size:12px;color:#b0d4f1;line-height:1.5">'+levels.bronze+'</div></div></div>';
+        if(levels.silver) html += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px"><span style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#c0c0c0,#a8a8a8);display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(192,192,192,0.3)">🥈</span><div style="flex:1;padding-top:3px"><div style="font-size:10px;color:#c0c0c0;font-weight:600;margin-bottom:2px">银勋章</div><div style="font-size:12px;color:#b0d4f1;line-height:1.5">'+levels.silver+'</div></div></div>';
+        if(levels.gold) html += '<div style="display:flex;align-items:flex-start;gap:8px"><span style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#ffd700,#ffb300);display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(255,215,0,0.3)">🥇</span><div style="flex:1;padding-top:3px"><div style="font-size:10px;color:#ffd700;font-weight:600;margin-bottom:2px">金勋章</div><div style="font-size:12px;color:#b0d4f1;line-height:1.5">'+levels.gold+'</div></div></div>';
+        html += '</div>';
+      } else {
+        var condText = m.rule||'—';
+        if(isWhitelist) { html += '<div style="background:rgba(171,71,188,0.08);border:1px dashed rgba(171,71,188,0.25);border-radius:8px;padding:10px 12px;margin-bottom:8px"><div style="font-size:12px;color:#ab47bc;line-height:1.6">🔒 '+condText+'</div></div>'; }
+        else { html += '<div style="background:rgba(15,25,35,0.6);border-radius:8px;padding:10px 12px;margin-bottom:8px"><div style="font-size:12px;color:#b0d4f1;line-height:1.6">'+condText.replace(/\n/g,'<br>')+'</div></div>'; }
+      }
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #1e3550"><div style="font-size:11px;color:#5a7a95">'+(m.launch_date?'📅 '+m.launch_date:'📅 未公布')+'</div>';
+      if(m.link&&m.link!=='无') html += '<a href="'+m.link+'" target="_blank" style="font-size:11px;color:#26c6da;text-decoration:none;padding:2px 8px;border:1px solid rgba(38,198,218,0.3);border-radius:10px">去参与 →</a>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+  });
+  document.getElementById('medalCondGrid').innerHTML = html;
+}
+renderCondGrid();
+
+// ===== CHARTS =====
+Chart.defaults.font.family = "-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif";
+Chart.defaults.color = '#7a9bb5';
+
+var top20 = DATA.medals.slice(0, 20);
+new Chart(document.getElementById('chartTopMedals'), { type:'bar', data:{labels:top20.map(function(m){return m.name}),datasets:[{label:'获得人数',data:top20.map(function(m){return m.count}),backgroundColor:top20.map(function(m){var r=m.count/TOTAL_EMP*100;if(r>=30)return'rgba(255,215,0,0.7)';if(r>=10)return'rgba(79,195,247,0.7)';if(r>=3)return'rgba(102,187,106,0.7)';if(r>=0.5)return'rgba(255,167,38,0.7)';return'rgba(171,71,188,0.7)';}),borderRadius:4}]}, options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return '获得人数: '+fmt(ctx.raw)+' ('+pct(ctx.raw)+')'}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'获得人数',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:11}}}}} });
+
+var rangeColors = ['#ef5350','#ffa726','#4fc3f7','#4fc3f7','#66bb6a','#66bb6a','#ab47bc','#ab47bc'];
+new Chart(document.getElementById('chartRanges'), { type:'bar', data:{labels:DATA.ranges.map(function(r){return r.label}),datasets:[{label:'人数',data:DATA.ranges.map(function(r){return r.count}),backgroundColor:rangeColors,borderRadius:6}]}, options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return fmt(ctx.raw)+' 人 ('+(ctx.raw/TOTAL*100).toFixed(1)+'%)'}}}},scales:{x:{grid:{display:false}},y:{grid:{color:'#1e3550'},title:{display:true,text:'人数',color:'#7a9bb5'}}}} });
+
+var tiersData = {'无人获得':0,'困难':0,'较难':0,'适中':0,'简单':0};
+DATA.medals.forEach(function(m){tiersData[getTier(m.count).label]++});
+new Chart(document.getElementById('chartTierPie'), { type:'doughnut', data:{labels:['无人获得(0%): '+tiersData['无人获得']+'种','困难(0%-10%): '+tiersData['困难']+'种','较难(10%-30%): '+tiersData['较难']+'种','适中(30%-60%): '+tiersData['适中']+'种','简单(≥60%): '+tiersData['简单']+'种'],datasets:[{data:[tiersData['无人获得'],tiersData['困难'],tiersData['较难'],tiersData['适中'],tiersData['简单']],backgroundColor:['rgba(90,122,149,0.8)','rgba(239,83,80,0.8)','rgba(255,112,67,0.8)','rgba(255,167,38,0.8)','rgba(102,187,106,0.8)'],borderColor:'#162636',borderWidth:2}]}, options:{responsive:true,plugins:{legend:{position:'bottom',labels:{padding:14,usePointStyle:true}}}} });
+
+
+// ===== DIFFICULTY DISTRIBUTION (only bar chart, no curve) =====
+function isRestricted(m) { return (m.rule&&m.rule.indexOf('白名单')>=0)||m.medal_type==='限定勋章'; }
+var diffBands = [
+  {label:'0%',min:0,max:0,color:'#5a7a95'},{label:'0%-10%',min:0.001,max:10,color:'#ef5350'},
+  {label:'10%-20%',min:10,max:20,color:'#ff7043'},{label:'20%-30%',min:20,max:30,color:'#ffa726'},
+  {label:'30%-40%',min:30,max:40,color:'#ffca28'},{label:'40%-50%',min:40,max:50,color:'#c0ca33'},
+  {label:'50%-60%',min:50,max:60,color:'#9ccc65'},{label:'60%-70%',min:60,max:70,color:'#66bb6a'},
+  {label:'70%-80%',min:70,max:80,color:'#26a69a'},{label:'80%-90%',min:80,max:90,color:'#26c6da'},
+  {label:'90%-100%',min:90,max:100,color:'#4fc3f7'}
+];
+var activeMedals = DATA.medals.filter(function(m){return m.count>0;});
+diffBands.forEach(function(band) {
+  if(band.min===0&&band.max===0){band.normal=DATA.medals.filter(function(m){return m.count===0&&!isRestricted(m);});band.restricted=DATA.medals.filter(function(m){return m.count===0&&isRestricted(m);});}
+  else{band.normal=activeMedals.filter(function(m){var rate=m.count/TOTAL_EMP*100;return rate>=band.min&&rate<band.max&&!isRestricted(m);});band.restricted=activeMedals.filter(function(m){var rate=m.count/TOTAL_EMP*100;return rate>=band.min&&rate<band.max&&isRestricted(m);});}
+  band.normalCount=band.normal.length;band.restrictedCount=band.restricted.length;band.count=band.normalCount+band.restrictedCount;
+});
+
+var diffSummary = [
+  {label:'无人获得',sub:'刚上线，0人获得',color:'#5a7a95',count:diffBands[0].count},
+  {label:'限定',sub:'白名单/限定勋章',color:'#ab47bc',count:diffBands.reduce(function(s,b){return s+b.restrictedCount;},0)},
+  {label:'困难',sub:'非限定 · 发放率 0%-10%',color:'#ef5350',count:diffBands.slice(1,2).reduce(function(s,b){return s+b.normalCount;},0)},
+  {label:'较难',sub:'非限定 · 发放率 10%-30%',color:'#ff7043',count:diffBands.slice(2,4).reduce(function(s,b){return s+b.normalCount;},0)},
+  {label:'适中',sub:'非限定 · 发放率 30%-60%',color:'#ffa726',count:diffBands.slice(4,7).reduce(function(s,b){return s+b.normalCount;},0)},
+  {label:'简单',sub:'非限定 · 发放率 ≥ 60%',color:'#66bb6a',count:diffBands.slice(7).reduce(function(s,b){return s+b.normalCount;},0)}
+];
+document.getElementById('diffHighlight').innerHTML = '<div class="dist-highlight">'+diffSummary.map(function(d){return '<div class="dist-card"><div class="dist-label">'+d.label+'</div><div class="dist-value" style="color:'+d.color+'">'+d.count+'枚</div><div class="dist-sub">'+d.sub+'</div></div>';}).join('')+'</div>';
+
+var diffDistLabelsPlugin = {
+  id:'diffDistLabels',
+  afterDatasetsDraw:function(chart) {
+    var ctx=chart.ctx;var data0=chart.data.datasets[0].data;var data1=chart.data.datasets[1].data;var meta0=chart.getDatasetMeta(0);var meta1=chart.getDatasetMeta(1);
+    function drawPill(x,y,text,fillColor,strokeColor){ctx.save();ctx.font='700 12px -apple-system,PingFang SC,Microsoft YaHei,sans-serif';var tw=ctx.measureText(text).width;var p=6,w=tw+p*2,h=20,lx=x-w/2,ly=y-h/2;var r=5;ctx.fillStyle='rgba(15,25,35,0.9)';ctx.beginPath();ctx.moveTo(lx+r,ly);ctx.lineTo(lx+w-r,ly);ctx.quadraticCurveTo(lx+w,ly,lx+w,ly+r);ctx.lineTo(lx+w,ly+h-r);ctx.quadraticCurveTo(lx+w,ly+h,lx+w-r,ly+h);ctx.lineTo(lx+r,ly+h);ctx.quadraticCurveTo(lx,ly+h,lx,ly+h-r);ctx.lineTo(lx,ly+r);ctx.quadraticCurveTo(lx,ly,lx+r,ly);ctx.closePath();ctx.fill();ctx.strokeStyle=strokeColor;ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle=fillColor;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x,y);ctx.restore();}
+    for(var i=0;i<meta0.data.length;i++){var total=data0[i]+data1[i];if(total===0)continue;var topBar=meta1.data[i];var topY=topBar.y-15;drawPill(topBar.x,topY,total+'枚','#e0e6ed','rgba(224,230,237,0.3)');var hasBoth=data0[i]>0&&data1[i]>0;if(hasBoth){if(data0[i]>0){var bar0=meta0.data[i];ctx.save();ctx.font='700 12px -apple-system,PingFang SC,Microsoft YaHei,sans-serif';ctx.fillStyle=diffBands[i].color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(data0[i],bar0.x,(bar0.y+bar0.base)/2);ctx.restore();}if(data1[i]>0){var bar1=meta1.data[i];ctx.save();ctx.font='700 12px -apple-system,PingFang SC,Microsoft YaHei,sans-serif';ctx.fillStyle='#ab47bc';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(data1[i],bar1.x,(bar1.y+bar1.base)/2);ctx.restore();}}}
+  }
+};
+
+new Chart(document.getElementById('chartDiffDist'), {
+  type: 'bar',
+  plugins: [diffDistLabelsPlugin],
+  data: {
+    labels: diffBands.map(function(b){return b.label;}),
+    datasets: [
+      {label:'常规勋章',data:diffBands.map(function(b){return b.normalCount;}),backgroundColor:diffBands.map(function(b){return b.color+'bb';}),borderColor:diffBands.map(function(b){return b.color;}),borderWidth:1,borderRadius:4},
+      {label:'限定勋章',data:diffBands.map(function(b){return b.restrictedCount;}),backgroundColor:'rgba(171,71,188,0.7)',borderColor:'#ab47bc',borderWidth:1,borderRadius:2}
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio: false,
+    layout:{padding:{top:28,bottom:4}},
+    plugins:{legend:{display:true,position:'top',labels:{padding:14,usePointStyle:true,pointStyleWidth:10,color:'#c8dce8',font:{size:12}}},title:{display:true,text:'各发放率区间的勋章数量分布（常规 vs 限定）',color:'#c8dce8',font:{size:14,weight:'600'},padding:{bottom:12}},tooltip:{callbacks:{title:function(items){return '发放率 '+items[0].label;},label:function(ctx){if(ctx.datasetIndex===0)return '常规: '+diffBands[ctx.dataIndex].normalCount+'枚';else return '限定: '+diffBands[ctx.dataIndex].restrictedCount+'枚';},afterBody:function(items){var band=diffBands[items[0].dataIndex];var all=band.normal.concat(band.restricted);if(all.length===0)return '';var names=all.slice(0,6).map(function(m){return m.name;}).join('、');if(all.length>6)names+=' 等';return names;}}}},
+    scales:{x:{stacked:true,grid:{display:false},title:{display:true,text:'采销岗发放率区间',color:'#c8dce8',font:{size:13,weight:'600'}},ticks:{color:'#9cc5dc',font:{size:11},maxRotation:45}},y:{stacked:true,grid:{color:'#1e3550'},title:{display:true,text:'勋章数量（枚）',color:'#c8dce8',font:{size:13,weight:'600'}},beginAtZero:true,ticks:{color:'#9cc5dc',stepSize:2,font:{size:12}}}}
+  }
+});
+
+// Difficulty insights
+var aggZero=diffSummary[0].count,aggRestricted=diffSummary[1].count,aggHard=diffSummary[2].count,aggHarder=diffSummary[3].count,aggModerate=diffSummary[4].count,aggSimple=diffSummary[5].count;
+var diffInsightData = [
+  {tag:'难易分化',tagColor:'#f06292',text:'<b>'+DATA.uniqueMedals+'种勋章</b>中，<b>'+aggSimple+'枚为"简单"</b>（非限定，发放率≥60%），<b>'+aggModerate+'枚为"适中"</b>（非限定，发放率30%-60%），<b>'+aggHarder+'枚为"较难"</b>（非限定，发放率10%-30%），<b>'+aggHard+'枚为"困难"</b>（非限定，发放率0%-10%），另有<b>'+aggRestricted+'枚为"限定"</b>（白名单/限定勋章，发放率低不代表难）和<b>'+aggZero+'枚无人获得</b>（刚上线）。排除限定后，困难+无人获得占比<b>'+((aggHard+aggZero)/DATA.uniqueMedals*100).toFixed(1)+'%</b>。'},
+  {tag:'限定≠困难',tagColor:'#ab47bc',text:'<b>'+aggRestricted+'枚限定勋章</b>（智学先锋、超级数据官、感恩共建等）因"白名单"机制导致发放率低，并非因为获取门槛高。其中智学先锋发放率高达44.65%，但因白名单模式限制了覆盖面。若将限定勋章从"困难"中剥离，真正的困难勋章仅<b>'+aggHard+'枚</b>。'},
+  {tag:'核心洞察',tagColor:'#4fc3f7',text:'排除限定后，采销岗的勋章难易呈<b>"两极分化"</b>：<b>'+aggSimple+'枚简单勋章</b>以场景情感/纪念类为主，"登录即得"；<b>'+aggHard+'枚困难勋章</b>以功能牵引类为主，需主动使用工具。从30%到60%的"适中"区间仅<b>'+aggModerate+'枚</b>，说明<b>简单与困难之间缺少平滑过渡</b>，建议增加"中间难度"勋章以丰富进阶体验。'}
+];
+document.getElementById('diffInsights').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">'+diffInsightData.map(function(c){return '<div style="background:rgba(240,98,146,0.05);border:1px solid rgba(240,98,146,0.12);border-radius:10px;padding:14px 16px"><div style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;margin-bottom:8px;background:rgba(240,98,146,0.12);color:'+c.tagColor+'">'+c.tag+'</div><div style="font-size:13px;color:#b0d4f1;line-height:1.8">'+c.text+'</div></div>';}).join('')+'</div>';
+
+// Difficulty detail table
+var diffTableRows = [];
+var diffCategories = [{label:'限定',medals:DATA.medals.filter(function(m){return isRestricted(m);}),color:'#ab47bc'},{label:'0%',medals:DATA.medals.filter(function(m){return m.count===0&&!isRestricted(m);}),color:'#5a7a95'}];
+diffBands.slice(1).forEach(function(band){var normal=band.normal;if(normal.length>0)diffCategories.push({label:band.label,medals:normal,color:band.color});});
+diffCategories.forEach(function(cat){var sorted=cat.medals.slice().sort(function(a,b){return b.count-a.count;});sorted.forEach(function(m){var rate=m.count/TOTAL_EMP*100;diffTableRows.push({name:m.name,purpose:m.purpose,medalType:m.medal_type,count:m.count,rate:rate,cat:cat});});});
+document.getElementById('diffTable').innerHTML = diffTableRows.map(function(row,idx) {
+  var tier = getTier(row.count); var origMedal = DATA.medals.find(function(m){return m.name===row.name;}); var restrBadge = '';
+  if(origMedal&&isRestricted(origMedal)) restrBadge = ' <span class="type-badge" style="background:rgba(171,71,188,0.15);color:#ab47bc">限定</span>';
+  return '<tr'+(idx>0&&diffTableRows[idx-1].cat.label!==row.cat.label?' style="border-top:2px solid #2a4a6a"':'')+'><td class="rank">'+(idx+1)+'</td><td class="medal-name">'+row.name+restrBadge+'</td><td>'+purposeBadge(row.purpose)+'</td><td>'+typeBadge(row.medalType)+'</td><td class="count">'+fmt(row.count)+'</td><td class="pct" style="color:'+row.cat.color+';font-weight:600">'+row.rate.toFixed(2)+'%</td><td><span class="tier-badge '+tier.cls+'">'+tier.label+'</span></td></tr>';
+}).join('');
+
+// ===== PERCENTILE =====
+var percentiles = [{label:'P10',value:DATA.percentiles.p10},{label:'P25',value:DATA.percentiles.p25},{label:'P50(中位数)',value:DATA.percentiles.p50},{label:'P75',value:DATA.percentiles.p75},{label:'P90',value:DATA.percentiles.p90},{label:'P95',value:DATA.percentiles.p95},{label:'P99',value:DATA.percentiles.p99}];
+document.getElementById('percentileBar').innerHTML = percentiles.map(function(p){return '<div class="percentile-row"><div class="percentile-label">'+p.label+'</div><div class="percentile-track"><div class="percentile-fill" style="width:'+(p.value/DATA.maxMedals*100)+'%"></div></div><div class="percentile-value">'+p.value+'枚</div></div>';}).join('');
+
+
+// ===== CUMULATIVE =====
+var cumData = DATA.distribution.map(function(d){var ge=DATA.distribution.filter(function(dd){return dd.count>=d.count}).reduce(function(s,dd){return s+dd.users},0);return{count:d.count,pct:+(ge/TOTAL*100).toFixed(2)};}).filter(function(d,i){return DATA.distribution[i].users>0});
+new Chart(document.getElementById('chartCumulative'), { type:'line', data:{labels:cumData.map(function(d){return d.count+'枚'}),datasets:[{label:'累计占比(%)',data:cumData.map(function(d){return d.pct}),borderColor:'#ffa726',backgroundColor:'rgba(255,167,38,0.1)',fill:true,tension:0.3,pointRadius:2,pointHoverRadius:5}]}, options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return '拥有 ≥ '+ctx.label+': '+ctx.raw+'% 的采销岗用户'}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'勋章数量',color:'#7a9bb5'}},y:{grid:{color:'#1e3550'},title:{display:true,text:'累计用户占比(%)',color:'#7a9bb5'},min:0,max:100}}} });
+
+// ===== DEPARTMENT =====
+var deptData = DEPT.deptSummary.filter(function(d){return d.total>=10;});
+document.getElementById('deptCards').innerHTML = deptData.map(function(d){return '<div class="dept-card"><div class="dept-name">'+d.name+'</div><div class="dept-avg">'+d.avg+'</div><div class="dept-meta">人均勋章 · '+fmt(d.total)+'人 · 仅1枚'+d.singleRate+'%</div></div>';}).join('');
+var deptChartDepts = deptData.slice().sort(function(a,b){return b.avg-a.avg;});
+new Chart(document.getElementById('chartDeptAvg'), { type:'bar', data:{labels:deptChartDepts.map(function(d){return d.name;}),datasets:[{label:'人均勋章数',data:deptChartDepts.map(function(d){return d.avg;}),backgroundColor:deptChartDepts.map(function(d){return d.avg>=13?'rgba(255,167,38,0.7)':d.avg>=10?'rgba(79,195,247,0.7)':d.avg>=5?'rgba(102,187,106,0.7)':'rgba(239,83,80,0.7)';}),borderRadius:4}]}, options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return '人均'+ctx.raw+'枚 · 中位数'+deptChartDepts[ctx.dataIndex].median+'枚';}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'人均勋章数',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:10}}}}} });
+new Chart(document.getElementById('chartDeptSingleRate'), { type:'bar', data:{labels:deptChartDepts.map(function(d){return d.name;}),datasets:[{label:'仅1枚用户占比',data:deptChartDepts.map(function(d){return d.singleRate;}),backgroundColor:deptChartDepts.map(function(d){return d.singleRate>=10?'rgba(239,83,80,0.7)':d.singleRate>=5?'rgba(255,167,38,0.7)':'rgba(102,187,106,0.7)';}),borderRadius:4}]}, options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.raw+'% 仅持1枚（'+fmt(deptChartDepts[ctx.dataIndex].singleCount)+'人）';}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'仅1枚用户占比(%)',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:10}}}}} });
+
+var roleData = DEPT.roleSummary;
+document.getElementById('roleCards').innerHTML = roleData.map(function(r){return '<div class="dept-card role-card"><div class="dept-name">'+r.name+'</div><div class="dept-avg">'+r.avg+'</div><div class="dept-meta">人均勋章 · '+fmt(r.total)+'人 · 仅1枚'+r.singleRate+'%</div></div>';}).join('');
+new Chart(document.getElementById('chartRoleAvg'), { type:'bar', data:{labels:roleData.map(function(r){return r.name;}),datasets:[{label:'人均勋章数',data:roleData.map(function(r){return r.avg;}),backgroundColor:roleData.map(function(r){return r.avg>=12?'rgba(171,71,188,0.7)':r.avg>=8?'rgba(255,167,38,0.7)':'rgba(239,83,80,0.7)';}),borderRadius:4}]}, options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return '人均'+ctx.raw+'枚 · 中位数'+roleData[ctx.dataIndex].median+'枚';}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'人均勋章数',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:11}}}}} });
+new Chart(document.getElementById('chartRoleSingleRate'), { type:'bar', data:{labels:roleData.map(function(r){return r.name;}),datasets:[{label:'仅1枚用户占比',data:roleData.map(function(r){return r.singleRate;}),backgroundColor:roleData.map(function(r){return r.singleRate>=10?'rgba(239,83,80,0.7)':r.singleRate>=5?'rgba(255,167,38,0.7)':'rgba(102,187,106,0.7)';}),borderRadius:4}]}, options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.raw+'% 仅持1枚（'+fmt(roleData[ctx.dataIndex].singleCount)+'人）';}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'仅1枚用户占比(%)',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:11}}}}} });
+
+var top20Dept = DEPT.medalDeptDist;
+var allDeptsForStack = []; var seen = {};
+for(var i=0;i<top20Dept.length;i++){for(var j=0;j<top20Dept[i].dist.length;j++){var dept=top20Dept[i].dist[j].dept;if(!seen[dept]){seen[dept]=true;allDeptsForStack.push(dept);}}}
+var deptStackColors = ['rgba(255,167,38,0.8)','rgba(79,195,247,0.8)','rgba(102,187,106,0.8)','rgba(171,71,188,0.8)','rgba(38,198,218,0.8)','rgba(255,183,77,0.8)','rgba(240,98,146,0.8)','rgba(129,199,132,0.8)','rgba(149,117,205,0.8)','rgba(77,182,172,0.8)','rgba(255,138,101,0.8)','rgba(189,189,189,0.8)','rgba(174,213,129,0.8)','rgba(144,164,174,0.8)','rgba(239,83,80,0.6)','rgba(255,215,0,0.8)','rgba(206,147,216,0.8)','rgba(128,203,196,0.8)','rgba(255,204,128,0.8)','rgba(165,214,167,0.8)','rgba(239,154,154,0.8)','rgba(144,202,249,0.8)','rgba(188,170,164,0.8)','rgba(178,235,242,0.8)','rgba(225,190,231,0.8)','rgba(200,230,201,0.8)','rgba(255,224,178,0.8)','rgba(248,187,208,0.8)','rgba(197,202,233,0.8)','rgba(255,245,157,0.8)','rgba(209,196,233,0.8)','rgba(178,223,219,0.8)','rgba(255,204,128,0.8)','rgba(248,187,208,0.8)','rgba(197,202,233,0.8)','rgba(225,190,231,0.8)','rgba(200,230,201,0.8)','rgba(255,224,178,0.8)','rgba(248,187,208,0.8)','rgba(197,202,233,0.8)','rgba(225,190,231,0.8)','rgba(200,230,201,0.8)'];
+new Chart(document.getElementById('chartMedalDeptStack'), { type:'bar', data:{labels:top20Dept.map(function(m){return m.name;}),datasets:allDeptsForStack.map(function(dept,idx){return{label:dept,data:top20Dept.map(function(m){var found=m.dist.find(function(d){return d.dept===dept;});return found?found.count:0;}),backgroundColor:deptStackColors[idx%deptStackColors.length],borderRadius:2};})}, options:{responsive:true,plugins:{legend:{position:'bottom',labels:{usePointStyle:true,padding:10,font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+fmt(ctx.raw)+'人';}}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10},maxRotation:45}},y:{stacked:true,grid:{color:'#1e3550'},title:{display:true,text:'获得人数',color:'#7a9bb5'}}}} });
+
+// ===== RECOMMENDATIONS =====
+var recommendations = [
+  {icon:'🎯',title:'采销岗专属勋章覆盖扩大',tag:'重要',tagCls:'tag-important',body:'"感恩共建"是采销工作台纪念勋章，仅 <span class="m">'+DATA.medals.find(function(m){return m.code==="ProductCoCreators"}).count+'</span> 人获得（占 <span class="m">'+(DATA.medals.find(function(m){return m.code==="ProductCoCreators"}).count/TOTAL_EMP*100).toFixed(2)+'%</span>），为白名单模式。"勤学善思"勋章覆盖率也仅 <span class="m">'+(DATA.medals.find(function(m){return m.code==="OswGrow"}).count/TOTAL_EMP*100).toFixed(1)+'%</span>，作为采销岗专属勋章未能全面覆盖。',action:'将"采销工作台纪念"勋章从白名单改为"首次登录采销工作台即得"模式，提升采销岗专属勋章的归属感与覆盖率。'},
+  {icon:'🚩',title:'企业业务采销岗勋章低谷问题',tag:'紧急',tagCls:'tag-urgent',body:'企业业务采销岗人均仅 <span class="m">5.43</span> 枚，远低于采销岗整体均值 <span class="m">'+DATA.avgMedals+'</span> 枚；仅1枚占比 <span class="m">4.8%</span>，组长岗位仅1枚占比更高达 <span class="m">0.7%</span>。说明企业业务采销岗对勋章体系触达不足。',action:'针对企业业务采销岗定制专属勋章引导路径：首次使用CRM、首次登录采销工作台、首次使用AI专员等，降低门槛让更多企业业务采销岗员工获得首枚勋章。'},
+  {icon:'📊',title:'发挥采销岗"达人"优势',tag:'战略',tagCls:'tag-strategic',body:'采销岗人均 <span class="m">'+DATA.avgMedals+'</span> 枚，是全员的 <span class="m">'+(DATA.avgMedals/5.30).toFixed(1)+'倍</span>。可利用这一优势，将采销岗打造为勋章体系的"标杆群体"，带动其他岗位员工积极参与。',action:'设置采销岗"勋章榜单"，每月公布采销岗勋章排行榜；设计采销岗专属成就体系（如"采销三星""采销五星"），形成内部竞争氛围。'},
+  {icon:'🔧',title:'功能牵引类勋章精细化运营',tag:'重要',tagCls:'tag-important',body:'功能牵引类 <span class="m">'+(DATA.purposeBreakdown['功能牵引类']||0)+'</span> 种勋章中，获得率不足1%的有 <span class="m">'+DATA.medals.filter(function(m){return m.purpose==='功能牵引类'&&m.count/TOTAL_EMP*100<1}).length+'</span> 种。即便在采销岗这个高活跃群体中，部分功能勋章仍然门槛过高。',action:'降低功能牵引类铜级勋章门槛，确保采销岗铜级获得率≥15%；在采销工作台内嵌入勋章入口引导；对低获得率勋章在采销岗进行专项推广。'},
+  {icon:'📈',title:'缩小岗位内部差异',tag:'建议',tagCls:'tag-suggest',body:'采销岗(14.81枚) vs 助理采销岗(11.24枚) vs 企业业务采销岗(5.43枚)，同为"采销"但勋章获得差异巨大。主要原因是企业业务采销岗对采销工作台及AI工具触达不足。',action:'为企业业务采销岗设计专属新手引导勋章路径，降低其获得首枚勋章的门槛；对助理采销岗设置"晋升勋章"激励，助力向采销岗转化。'},
+  {icon:'🏷️',title:'清理采销岗无效勋章',tag:'建议',tagCls:'tag-suggest',body:'无人获得和困难等级勋章共 <span class="m">'+(dTierCount+hardCount)+'</span> 种。即便在采销岗这个高活跃群体中，"创意模板师"仅 <span class="m">4</span> 人获得，"成长共筑者"仅 <span class="m">5</span> 人。这些勋章在采销岗中形同虚设。',action:'对采销岗获得人数<10的勋章标记"休眠"并审查；降低其铜级门槛或改为参与即得；新勋章上线前设定采销岗最低发放目标（月发放≥30人）。'}
+];
+document.getElementById('recommendations').innerHTML = recommendations.map(function(r){return '<div class="rec-card"><div class="rec-header"><span class="rec-icon">'+r.icon+'</span><span class="rec-title">'+r.title+'</span><span class="rec-tag '+r.tagCls+'">'+r.tag+'</span></div><div class="rec-body">'+r.body+'</div><div class="rec-action">'+r.action+'</div></div>';}).join('');
+
+// ==================== Tool Logic (指标设定工具) ====================
+let usageData = [];
+let tiers = [];
+let dimension = 'days';
+
+const BADGE_CLASSES = ['badge-bronze', 'badge-silver', 'badge-gold'];
+const BADGE_COLORS  = ['#cd7f32', '#c0c0c0', '#ffd700'];
+const BADGE_ICONS   = ['🥉', '🥈', '🥇'];
+const DEFAULT_NAMES = ['铜牌', '银牌', '金牌'];
+const TARGET_RANGES = [
+  { min: 0.25, max: 0.45, ideal: 0.35 },
+  { min: 0.10, max: 0.25, ideal: 0.17 },
+  { min: 0.03, max: 0.10, ideal: 0.06 },
+];
+
+function initTool() {
+  const defaults = [{value:1,count:''},{value:2,count:''},{value:3,count:''},{value:5,count:''},{value:7,count:''},{value:10,count:''},{value:15,count:''},{value:20,count:''},{value:30,count:''}];
+  defaults.forEach(d => addUsageRow(d.value, d.count));
+  loadPreset('standard');
+}
+
+function addUsageRow(value='', count='') { usageData.push({value,count}); renderUsageTable(); }
+function addBatchRows() {
+  const start = parseInt(prompt('起始天数/次数:','1'))||1;
+  const end = parseInt(prompt('结束天数/次数:','30'))||30;
+  const step = parseInt(prompt('步长:','1'))||1;
+  for(let i=start;i<=end;i+=step){if(!usageData.find(d=>d.value==i))usageData.push({value:i,count:''});}
+  usageData.sort((a,b)=>a.value-b.value); renderUsageTable();
+}
+function removeUsageRow(idx) { usageData.splice(idx,1); renderUsageTable(); recalculate(); }
+function clearUsageData() { usageData=[]; renderUsageTable(); recalculate(); }
+
+function renderUsageTable() {
+  const dimLabel = dimension==='days'?'天数':'次数';
+  document.querySelectorAll('.dim-label').forEach(el=>el.textContent=dimLabel);
+  const tbody = document.getElementById('usageBody');
+  const totalUsers = parseInt(document.getElementById('totalUsers').value)||0;
+  let html = '';
+  usageData.forEach((d,i) => {
+    const p = (totalUsers>0&&d.count)?((parseInt(d.count)/totalUsers*100).toFixed(1)+'%'):'-';
+    html += '<tr class="fade-in"><td><input type="number" min="1" value="'+d.value+'" onchange="updateUsageVal('+i+',this.value)" class="tool-input" style="width:80px;"></td><td><input type="number" min="0" value="'+d.count+'" placeholder="人数" onchange="updateUsageCnt('+i+',this.value)" oninput="updateUsageCnt('+i+',this.value)" class="tool-input" style="width:100px;"></td><td style="color:#5a7a95;font-size:13px;">'+p+'</td><td><button class="tool-btn tool-btn-danger tool-btn-sm" onclick="removeUsageRow('+i+')" style="padding:3px 8px;">✕</button></td></tr>';
+  });
+  tbody.innerHTML = html;
+  updateQuickSummary();
+}
+
+function updateUsageVal(idx,val) { usageData[idx].value=parseInt(val)||0; usageData.sort((a,b)=>a.value-b.value); renderUsageTable(); recalculate(); }
+function updateUsageCnt(idx,val) { usageData[idx].count=val; const totalUsers=parseInt(document.getElementById('totalUsers').value)||0; const rows=document.querySelectorAll('#usageBody tr'); if(rows[idx]){const pctCell=rows[idx].cells[2];const cnt=parseInt(val)||0;pctCell.textContent=totalUsers>0?(cnt/totalUsers*100).toFixed(1)+'%':'-';} updateQuickSummary(); }
+function onDimensionChange() {
+  dimension=document.getElementById('dimension').value;
+  document.querySelectorAll('.tool-dim-option').forEach(o=>o.classList.remove('active'));
+  const dimOptions=document.querySelectorAll('.tool-dim-option');
+  dimOptions.forEach(o=>{if(o.querySelector('.dim-text')&&o.querySelector('.dim-text').textContent.trim().startsWith(dimension==='days'?'天数':'次数'))o.classList.add('active');});
+  const dimSelect=document.getElementById('dimension'); const hint=dimSelect.parentElement.querySelector('.tool-scenario-set-hint'); if(hint)hint.style.display='none';
+  renderUsageTable(); renderTierTable();
+}
+function updateQuickSummary() {
+  const total=parseInt(document.getElementById('totalUsers').value)||0;
+  const reported=usageData.reduce((s,d)=>s+(parseInt(d.count)||0),0);
+  const el=document.getElementById('quickSummary');
+  if(total===0){el.textContent='请先输入整体用户总数';return;}
+  const coverage=(reported/total*100).toFixed(1);const nonUsers=total-reported;
+  el.innerHTML='已录入 <strong>'+reported.toLocaleString()+'</strong> 人（覆盖 '+coverage+'%）· 未使用/未录入 <strong>'+nonUsers.toLocaleString()+'</strong> 人';
+}
+
+function addTierRow(name,threshold) {
+  const idx=tiers.length;
+  tiers.push({name:name||DEFAULT_NAMES[idx]||'第'+(idx+1)+'级',threshold:threshold||'',color:BADGE_COLORS[idx]||'#999',badgeClass:BADGE_CLASSES[idx]||'badge-bronze',icon:BADGE_ICONS[idx]||'🏅'});
+  renderTierTable();
+}
+function removeTierRow(idx) { tiers.splice(idx,1); tiers.forEach((t,i)=>{t.color=BADGE_COLORS[i]||'#999';t.badgeClass=BADGE_CLASSES[i]||'badge-bronze';t.icon=BADGE_ICONS[i]||'🏅';}); renderTierTable(); recalculate(); }
+function renderTierTable() {
+  const dimLabel=dimension==='days'?'天数':'次数';
+  const thead=document.querySelector('#tierTable thead tr'); thead.cells[2].innerHTML='最低<span class="dim-label">'+dimLabel+'</span>';
+  const tbody=document.getElementById('tierBody'); let html='';
+  tiers.forEach((t,i)=>{html+='<tr class="fade-in"><td><span class="tool-badge '+t.badgeClass+'">'+t.icon+' '+t.name+'</span></td><td><input type="text" value="'+t.name+'" onchange="tiers['+i+'].name=this.value;renderTierTable()" class="tool-input" style="width:80px;"></td><td><input type="number" min="1" value="'+t.threshold+'" placeholder="≥?" onchange="tiers['+i+'].threshold=this.value;recalculate()" class="tool-input" style="width:80px;"></td><td><button class="tool-btn tool-btn-danger tool-btn-sm" onclick="removeTierRow('+i+')" style="padding:3px 8px;">✕</button></td></tr>';});
+  tbody.innerHTML=html;
+}
+function loadPreset(type) { tiers=[]; if(type==='standard'){[['铜牌',3],['银牌',7],['金牌',15]].forEach(([n,t])=>addTierRow(n,t));} recalculate(); }
+
+function recalculate() { updateQuickSummary(); }
+
+function calculate() {
+  const totalUsers=parseInt(document.getElementById('totalUsers').value)||0;
+  if(totalUsers<=0){alert('请输入整体用户总数！');return;}
+  const data=usageData.filter(d=>d.value&&d.count).map(d=>({value:parseInt(d.value),count:parseInt(d.count)})).sort((a,b)=>a.value-b.value);
+  if(data.length===0){alert('请至少输入一条使用数据！');return;}
+  if(tiers.length===0){alert('请设定至少一个勋章层级！');return;}
+  const reported=data.reduce((s,d)=>s+d.count,0);const nonUsers=Math.max(0,totalUsers-reported);
+  function buildCumulativeDist(dataArr){return function(threshold){return dataArr.filter(d=>d.value>=threshold).reduce((s,d)=>s+d.count,0);};}
+  const getCumulative=buildCumulativeDist(data);
+  const currentResults=tiers.map(t=>{const threshold=parseInt(t.threshold);if(!threshold)return{...t,currentCount:0,currentPct:0};const count=getCumulative(threshold);return{...t,threshold,currentCount:count,currentPct:count/totalUsers};});
+  const dataPeriodMonths=parseFloat(document.getElementById('dataPeriod').value)||1;
+  const forecastPeriodVal=parseInt(document.getElementById('forecastPeriod').value)||3;
+  const forecastTimeLabel=forecastPeriodVal+'个月';
+  const scaleFactor=forecastPeriodVal/dataPeriodMonths;
+  function forecastCumulative(threshold) {
+    const adjustedThreshold=threshold/scaleFactor;
+    const sortedData=[...data].sort((a,b)=>a.value-b.value);
+    let lower=null,upper=null;
+    for(let i=0;i<sortedData.length;i++){if(sortedData[i].value<=adjustedThreshold)lower=sortedData[i];if(sortedData[i].value>=adjustedThreshold&&!upper)upper=sortedData[i];}
+    if(!lower&&!upper)return 0;if(!lower)return getCumulative(upper.value);if(!upper)return getCumulative(lower.value);if(lower.value===upper.value)return getCumulative(lower.value);
+    const lowerCum=getCumulative(upper.value);const upperCum=getCumulative(lower.value);const ratio=(adjustedThreshold-lower.value)/(upper.value-lower.value);
+    return upperCum+(lowerCum-upperCum)*(1-ratio);
+  }
+  const forecastResults=tiers.map(t=>{const threshold=parseInt(t.threshold);if(!threshold)return{...t,forecastCount:0,forecastPct:0};const count=forecastCumulative(threshold);return{...t,threshold,forecastCount:Math.round(count),forecastPct:count/totalUsers};});
+  const results=currentResults.map((cr,i)=>({...cr,forecastCount:forecastResults[i].forecastCount,forecastPct:forecastResults[i].forecastPct,growthPct:cr.currentPct>0?((forecastResults[i].forecastPct-cr.currentPct)/cr.currentPct*100):Infinity}));
+  renderResults(results,totalUsers,nonUsers,scaleFactor,forecastTimeLabel);
+  generateRecommendations(data,totalUsers,nonUsers,getCumulative,forecastCumulative,forecastTimeLabel,scaleFactor);
+}
+
+function renderResults(results,totalUsers,nonUsers,scaleFactor,forecastTimeLabel) {
+  const dimLabel=dimension==='days'?'天':'次';const dimFullLabel=dimension==='days'?'天数':'次数';
+  document.getElementById('resultPlaceholder').style.display='none';
+  const area=document.getElementById('resultArea');area.style.display='block';
+  const dataPeriodMonths=parseFloat(document.getElementById('dataPeriod').value)||1;
+  let html='';
+  html+='<div class="tool-grid-3" style="margin-bottom:24px;">';
+  html+='<div class="tool-stat-box"><div class="val">'+totalUsers.toLocaleString()+'</div><div class="label">整体用户数</div></div>';
+  html+='<div class="tool-stat-box"><div class="val">'+dataPeriodMonths+'个月</div><div class="label">参考数据周期</div></div>';
+  html+='<div class="tool-stat-box"><div class="val">'+scaleFactor.toFixed(1)+'x</div><div class="label">上线'+forecastTimeLabel+'后累计倍数</div></div>';
+  html+='</div>';
+  html+='<div class="tool-tip">勋章上线后数据累加计算，从零开始累计。「上线首月」= 基于参考数据的达标比例，「上线'+forecastTimeLabel+'后」= 数据累计后的预测比例</div>';
+  html+='<table class="tool-table" style="margin-bottom:24px;"><thead><tr><th>勋章层级</th><th>阈值（'+dimFullLabel+'）</th><th>上线首月达标人数</th><th>上线首月达标比例</th><th>上线'+forecastTimeLabel+'后预测</th><th>达标提升</th><th>达标情况</th></tr></thead><tbody>';
+  results.forEach((r,i)=>{
+    const target=TARGET_RANGES[i]||TARGET_RANGES[TARGET_RANGES.length-1];const inRange=r.forecastPct>=target.min&&r.forecastPct<=target.max;const aboveRange=r.forecastPct>target.max;
+    let statusHtml='';if(inRange)statusHtml='<span style="color:#66bb6a;font-weight:600;">✓ 合理</span>';else if(aboveRange)statusHtml='<span style="color:#ff7043;font-weight:600;">⚠ 偏高</span>';else statusHtml='<span style="color:#ef5350;font-weight:600;">✕ 偏低</span>';
+    const growthStr=r.growthPct===Infinity?'∞':(r.growthPct>=0?'+':'')+r.growthPct.toFixed(1)+'%';
+    html+='<tr><td><span class="tool-badge '+r.badgeClass+'">'+r.icon+' '+r.name+'</span></td><td>≥ '+r.threshold+' '+dimLabel+'</td><td>'+r.currentCount.toLocaleString()+'</td><td>'+(r.currentPct*100).toFixed(1)+'%</td><td><strong style="color:#ffa726;">'+(r.forecastPct*100).toFixed(1)+'%</strong></td><td style="color:'+(r.growthPct>=0?'#66bb6a':'#ef5350')+';font-weight:500;">'+growthStr+'</td><td>'+statusHtml+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  html+='<div style="margin-bottom:20px;"><div style="font-size:15px;font-weight:600;margin-bottom:16px;color:#e0e6ed;">📊 上线首月 vs 上线'+forecastTimeLabel+'后 达标比例对比</div>';
+  results.forEach(r=>{
+    const target=TARGET_RANGES[tiers.indexOf(r)]||TARGET_RANGES[TARGET_RANGES.length-1];
+    html+='<div style="margin-bottom:16px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span class="tool-badge '+r.badgeClass+'" style="font-size:13px;">'+r.icon+' '+r.name+'（≥'+r.threshold+dimLabel+'）</span><span style="font-size:12px;color:#5a7a95;">目标：'+(target.min*100).toFixed(0)+'%~'+(target.max*100).toFixed(0)+'%</span></div>';
+    html+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;"><span style="font-size:12px;color:#5a7a95;width:56px;">首月</span><div class="tool-progress-bar" style="flex:1;"><div class="tool-progress-fill" style="width:'+Math.min(r.currentPct*100,100)+'%;background:'+r.color+';">'+(r.currentPct*100).toFixed(1)+'%</div></div></div>';
+    html+='<div style="display:flex;gap:6px;align-items:center;"><span style="font-size:12px;color:#5a7a95;width:56px;">'+forecastTimeLabel+'后</span><div class="tool-progress-bar" style="flex:1;"><div class="tool-progress-fill" style="width:'+Math.min(r.forecastPct*100,100)+'%;background:linear-gradient(90deg,'+r.color+','+r.color+'bb);">'+(r.forecastPct*100).toFixed(1)+'%</div></div></div></div>';
+  });
+  html+='</div>';
+  area.innerHTML=html;
+}
+
+function generateRecommendations(data,totalUsers,nonUsers,getCumulative,forecastCumulative,forecastTimeLabel,scaleFactor) {
+  const section=document.getElementById('recommendSection');section.style.display='block';
+  const area=document.getElementById('recommendArea');const dimLabel=dimension==='days'?'天':'次';
+  const sortedData=[...data].sort((a,b)=>a.value-b.value);const allValues=sortedData.map(d=>d.value);
+  function findBestThreshold(targetPct,minVal,maxVal) {
+    let bestThreshold=minVal,bestDiff=Infinity;const searchMin=Math.max(1,minVal);const searchMax=maxVal||Math.max(...allValues)*2;
+    for(let t=searchMin;t<=searchMax;t++){const forecastPct=forecastCumulative(t)/totalUsers;const diff=Math.abs(forecastPct-targetPct);if(diff<bestDiff){bestDiff=diff;bestThreshold=t;}}
+    const rounded=Math.round(bestThreshold/5)*5||bestThreshold;const roundedPct=forecastCumulative(rounded)/totalUsers;const originalPct=forecastCumulative(bestThreshold)/totalUsers;
+    if(Math.abs(roundedPct-targetPct)<0.02&&rounded>=searchMin)return{threshold:rounded,forecastPct:roundedPct,currentPct:getCumulative(rounded)/totalUsers};
+    return{threshold:bestThreshold,forecastPct:originalPct,currentPct:getCumulative(bestThreshold)/totalUsers};
+  }
+  const schemes=[
+    {name:'🎯 均衡方案',desc:'各层级比例接近理想值，覆盖面与稀缺性兼顾',targets:TARGET_RANGES.map(t=>t.ideal),recommended:true},
+    {name:'🌱 宽松方案',desc:'降低门槛，让更多人获得勋章，适合功能推广初期',targets:TARGET_RANGES.map(t=>t.max),recommended:false},
+    {name:'🏆 严格方案',desc:'提高门槛，勋章更有含金量，适合成熟期功能',targets:TARGET_RANGES.map(t=>t.min),recommended:false}
+  ];
+  const numTiers=Math.min(tiers.length,3);
+  schemes.forEach(scheme=>{let prevMax=0;scheme.results=[];for(let i=0;i<numTiers;i++){const targetPct=scheme.targets[i];const result=findBestThreshold(targetPct,prevMax+1,null);if(scheme.results.length>0&&result.threshold<=scheme.results[scheme.results.length-1].threshold){result.threshold=scheme.results[scheme.results.length-1].threshold+1;result.forecastPct=forecastCumulative(result.threshold)/totalUsers;result.currentPct=getCumulative(result.threshold)/totalUsers;}prevMax=result.threshold;scheme.results.push({...result,name:DEFAULT_NAMES[i],badgeClass:BADGE_CLASSES[i],icon:BADGE_ICONS[i],color:BADGE_COLORS[i]});}});
+  let html='';
+  const rec=schemes.find(s=>s.recommended);
+  html+='<div class="tool-result-card"><h3>⭐ 最优推荐方案：'+rec.name+' <span class="tool-recommend-tag">推荐</span></h3><p style="font-size:13px;opacity:.85;margin-bottom:16px;color:#0f1923;">'+rec.desc+'</p><div style="display:flex;gap:16px;flex-wrap:wrap;">';
+  rec.results.forEach(r=>{html+='<div class="badge-card"><div class="badge-label">'+r.icon+' '+r.name+'</div><div class="badge-threshold">≥'+r.threshold+dimLabel+'</div><div class="badge-pct">上线'+forecastTimeLabel+'后 '+(r.forecastPct*100).toFixed(1)+'% 达标</div></div>';});
+  html+='</div><div class="tool-btn-group" style="margin-top:16px;"><button class="tool-btn" style="background:#0f1923;color:#ffa726;font-weight:600;border-radius:8px;" onclick="applyRecommendation()">✓ 一键应用此方案</button></div></div>';
+  html+='<div style="font-size:15px;font-weight:600;margin-bottom:14px;color:#e0e6ed;">📋 三种方案对比</div>';
+  html+='<table class="tool-table tool-compare-table"><thead><tr><th>层级</th>';
+  schemes.forEach(s=>{html+='<th>'+s.name+(s.recommended?' <span class="tool-recommend-tag">推荐</span>':'')+'</th>';});
+  html+='</tr></thead><tbody>';
+  for(let i=0;i<numTiers;i++){html+='<tr><td><span class="tool-badge '+BADGE_CLASSES[i]+'">'+BADGE_ICONS[i]+' '+DEFAULT_NAMES[i]+'</span></td>';schemes.forEach(s=>{const r=s.results[i];const target=TARGET_RANGES[i]||TARGET_RANGES[TARGET_RANGES.length-1];const inRange=r.forecastPct>=target.min&&r.forecastPct<=target.max;html+='<td class="'+(s.recommended?'tool-recommended':'')+'" style="position:relative;"><div style="font-weight:600;font-size:15px;">≥ '+r.threshold+' '+dimLabel+'</div><div style="font-size:12px;color:#5a7a95;margin-top:2px;">首月 '+(r.currentPct*100).toFixed(1)+'% → 上线'+forecastTimeLabel+'后 '+(r.forecastPct*100).toFixed(1)+'%</div><div style="font-size:11px;margin-top:2px;color:'+(inRange?'#66bb6a':'#ff7043')+';font-weight:500;">'+(inRange?'✓ 合理':'⚠ 偏差')+'</div></td>';});html+='</tr>';}
+  html+='</tbody></table>';
+  schemes.forEach(s=>{html+='<div class="tool-scheme-desc '+(s.recommended?'rec':'')+'"><div style="font-size:14px;font-weight:600;">'+s.name+'</div><div style="font-size:12px;color:#5a7a95;margin-top:4px;">'+s.desc+'</div><div style="font-size:13px;margin-top:6px;color:#8aabb5;">'+s.results.map(r=>r.icon+r.name+' ≥'+r.threshold+dimLabel+'('+(r.forecastPct*100).toFixed(1)+'%)').join(' &nbsp;→&nbsp; ')+'</div></div>';});
+  window._recommendedScheme=rec;area.innerHTML=html;
+}
+
+function applyRecommendation() {
+  if(!window._recommendedScheme)return;
+  const rec=window._recommendedScheme;tiers=[];
+  rec.results.forEach((r,i)=>{tiers.push({name:r.name,threshold:r.threshold,color:r.color,badgeClass:r.badgeClass,icon:r.icon});});
+  renderTierTable();calculate();
+  document.getElementById('resultArea').scrollIntoView({behavior:'smooth'});
+}
+
+// ===== Tool Scenario Analysis =====
+const SCENARIO_RULES = {
+  days:{label:'天数',icon:'📅',keywords:['登录','签到','打卡','连续','每天','每日','日常','定期','习惯','活跃','出勤','在线','坚持','巡视','巡店','盯盘','跟进','看板','日报','周报','查看','浏览','关注','监控','追踪','持续'],reasons:['该场景侧重「持续性参与」，用天数衡量更能体现用户的习惯养成和粘性','按天计量可以鼓励用户持续回归，避免单日集中刷量后流失'],example:'如：使用该功能 ≥3天 获铜牌勋章，≥7天 获银牌勋章',bestFor:'需要培养用户日常使用习惯、提升DAU/MAU的场景'},
+  times:{label:'次数',icon:'🔢',keywords:['提交','创建','发布','操作','下单','采购','销售','审批','处理','完成','发货','结算','录入','填写','生成','搜索','查询','分享','转发','评论','沟通','发起','申请','报销','活动','促销','商品','供应商','比价'],reasons:['该场景侧重「行为产出量」，用次数衡量更能反映用户实际贡献度和参与深度','按次计量直接挂钩业务产出，勋章含金量更直观'],example:'如：使用该功能 ≥5次 获铜牌勋章，≥15次 获银牌勋章',bestFor:'需要衡量业务产出、推动用户完成关键操作的场景'}
+};
+const PRESET_SCENARIOS = {'使用采购审批功能完成审批流程':'times','每日登录系统':'days','提交采购单':'times','连续使用数据看板查看经营数据':'days','搜索商品或供应商':'times','发布促销活动':'times','每日查看经营日报并跟进异常':'days','与供应商在线沟通':'times','填写结算单完成结算':'times','持续关注价格波动做比价':'days'};
+
+function selectPreset(el,text) { document.getElementById('scenarioInput').value=text; document.querySelectorAll('.tool-preset-tag').forEach(t=>t.classList.remove('selected')); el.classList.add('selected'); analyzeScenario(); }
+
+function analyzeScenario() {
+  const text=document.getElementById('scenarioInput').value.trim();
+  if(!text){alert('请先输入或选择一个功能使用场景');return;}
+  let scores={days:0,times:0};let matchedKw={days:[],times:[]};
+  if(PRESET_SCENARIOS[text])scores[PRESET_SCENARIOS[text]]+=10;
+  for(const[dim,rule]of Object.entries(SCENARIO_RULES)){rule.keywords.forEach(kw=>{if(text.includes(kw)){scores[dim]+=1;matchedKw[dim].push(kw);}});}
+  matchedKw.days=[...new Set(matchedKw.days)];matchedKw.times=[...new Set(matchedKw.times)];
+  const total=scores.days+scores.times;let recommended,confidence;
+  if(total===0){if(text.includes('日')||text.includes('天')||text.includes('每')){recommended='days';confidence=0.5;}else{recommended='times';confidence=0.35;}}
+  else{recommended=scores.days>scores.times?'days':'times';const maxScore=Math.max(scores.days,scores.times);confidence=Math.min(0.95,0.5+(maxScore/total)*0.4);}
+  const rule=SCENARIO_RULES[recommended];const otherDim=recommended==='days'?'times':'days';const otherRule=SCENARIO_RULES[otherDim];const otherScore=scores[otherDim];
+  const confPct=Math.round(confidence*100);const confColor=confidence>=0.7?'#66bb6a':confidence>=0.5?'#ff7043':'#5a7a95';const confText=confidence>=0.7?'高':confidence>=0.5?'中':'低';
+  const html='<div><div class="tool-recommend-dim">'+rule.icon+' 推荐使用「'+rule.label+'」</div><div class="tool-confidence">置信度：<div class="tool-confidence-bar"><div class="tool-confidence-fill" style="width:'+confPct+'%;background:'+confColor+';"></div></div><span style="color:'+confColor+';font-weight:600;">'+confText+'（'+confPct+'%）</span></div></div><div class="tool-recommend-reason" style="margin-top:12px;"><strong>推荐理由：</strong><ul style="margin-top:6px;padding-left:20px;">'+rule.reasons.map(r=>'<li>'+r+'</li>').join('')+'</ul>'+(matchedKw[recommended].length>0?'<div style="margin-top:8px;color:#5a7a95;font-size:12px;">匹配关键词：'+matchedKw[recommended].map(k=>'<span style="background:rgba(255,167,38,0.12);color:#ffa726;padding:2px 8px;border-radius:4px;margin-right:4px;font-weight:500;">'+k+'</span>').join('')+'</div>':'')+'</div><div style="margin-top:12px;padding:12px 14px;background:rgba(15,25,35,0.5);border-radius:8px;font-size:12px;color:#8aabb5;border:1px solid #1e3550;"><div>📌 '+rule.example+'</div><div style="margin-top:4px;">💡 最适合：'+rule.bestFor+'</div>'+(otherScore>0?'<div style="margin-top:4px;color:#5a7a95;">⚠ 也匹配到「'+otherRule.label+'」关键词（'+matchedKw[otherDim].join('、')+'），但「'+rule.label+'」匹配度更高</div>':'')+'</div><div style="margin-top:16px;font-size:13px;color:#8aabb5;font-weight:500;">请确认要使用的维度：</div><div class="tool-dim-options"><div class="tool-dim-option '+(recommended==='days'?'active':'')+'" onclick="confirmDimension(\'days\',this)"><span class="dim-icon">📅</span><span class="dim-text">天数'+(recommended==='days'?' <span class="rec-badge">推荐</span>':'')+'</span></div><div class="tool-dim-option '+(recommended==='times'?'active':'')+'" onclick="confirmDimension(\'times\',this)"><span class="dim-icon">🔢</span><span class="dim-text">次数'+(recommended==='times'?' <span class="rec-badge">推荐</span>':'')+'</span></div></div>';
+  const resultEl=document.getElementById('recommendResult');resultEl.innerHTML=html;resultEl.classList.add('show');
+}
+
+function confirmDimension(dim,el) {
+  dimension=dim;document.getElementById('dimension').value=dim;document.querySelectorAll('.tool-dim-option').forEach(o=>o.classList.remove('active'));if(el)el.classList.add('active');
+  const dimSelect=document.getElementById('dimension');let hint=dimSelect.parentElement.querySelector('.tool-scenario-set-hint');if(!hint){hint=document.createElement('span');hint.className='tool-scenario-set-hint';dimSelect.parentElement.appendChild(hint);}hint.textContent='✓ 已根据场景设定';hint.style.display='inline-flex';
+  renderUsageTable();renderTierTable();document.getElementById('usageTable').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+// Init tool
+initTool();
+</script>
+
+</body>
+</html>
