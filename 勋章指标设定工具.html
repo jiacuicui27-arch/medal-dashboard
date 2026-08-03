@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勋章指标设定工具</title>
+<style>
+  :root {
+    --bg: #f0f2f5;
+    --card: #fff;
+    --border: #e8ecf1;
+    --border-light: #f0f3f7;
+    --text: #1d2129;
+    --text2: #4e5969;
+    --text3: #86909c;
+    --primary: #165dff;
+    --primary-hover: #4080ff;
+    --primary-light: #e8f3ff;
+    --primary-bg: #f2f7ff;
+    --success: #00b42a;
+    --success-light: #e8ffea;
+    --warning: #ff7d00;
+    --warning-light: #fff7e8;
+    --danger: #f53f3f;
+    --danger-light: #ffece8;
+    --gold: #f7ba1e;
+    --silver: #8c8c8c;
+    --bronze: #c47324;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.04);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,.06), 0 2px 4px rgba(0,0,0,.03);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ===== 页头 ===== */
+  .page-header {
+    text-align: center;
+    padding: 40px 20px 36px;
+    margin-bottom: 28px;
+    background: linear-gradient(135deg, #165dff 0%, #722ed1 100%);
+    border-radius: 16px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-header::before {
+    content: '';
+    position: absolute;
+    top: -40%; right: -10%;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .page-header::after {
+    content: '';
+    position: absolute;
+    bottom: -30%; left: 10%;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(255,255,255,.08) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .page-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; position: relative; letter-spacing: 1px; }
+  .page-header .subtitle { font-size: 15px; opacity: .85; position: relative; font-weight: 300; }
+
+  /* ===== 卡片区块 ===== */
+  .section {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: none;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+    transition: box-shadow .2s;
+  }
+  .section:hover { box-shadow: var(--shadow-lg); }
+  .section-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text);
+  }
+  .section-title .icon {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm);
+    font-size: 17px;
+  }
+  .section:nth-child(2) .section-title .icon { background: #e8f3ff; }
+  .section:nth-child(3) .section-title .icon { background: #e8ffea; }
+  .section:nth-child(4) .section-title .icon { background: #fff7e8; }
+  .section:nth-child(5) .section-title .icon { background: #f2f3ff; }
+  .section:nth-child(6) .section-title .icon { background: #fff0e6; }
+
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+  @media(max-width:900px) { .grid-2, .grid-3 { grid-template-columns:1fr; } }
+
+  /* ===== 表格 ===== */
+  table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; border-radius:var(--radius-sm); overflow:hidden; }
+  th {
+    background:#f7f8fa; font-weight:500; text-align:center; padding:10px 12px;
+    border-bottom:1px solid var(--border); color:var(--text2); font-size:13px;
+  }
+  td { padding:10px 12px; border-bottom:1px solid var(--border-light); text-align:center; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:#fafbfc; }
+
+  /* ===== 输入框 ===== */
+  input[type="number"], input[type="text"], select, textarea {
+    padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius-sm);
+    font-size:14px; outline:none; transition:all .2s; background:#fff;
+    color:var(--text);
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color:var(--primary);
+    box-shadow:0 0 0 3px rgba(22,93,255,.1);
+  }
+  input[type="number"] { text-align:center; }
+
+  /* ===== 按钮 ===== */
+  .btn {
+    padding:8px 18px; border:none; border-radius:var(--radius-sm); cursor:pointer;
+    font-size:14px; transition:all .15s; display:inline-flex; align-items:center; gap:5px;
+    font-weight:500; letter-spacing: .3px;
+  }
+  .btn:active { transform:scale(.97); }
+  .btn-primary { background:var(--primary); color:#fff; }
+  .btn-primary:hover { background:var(--primary-hover); box-shadow:0 2px 8px rgba(22,93,255,.3); }
+  .btn-success { background:var(--success); color:#fff; }
+  .btn-success:hover { background:#23c933; }
+  .btn-warning { background:var(--warning); color:#fff; }
+  .btn-danger { background:transparent; color:var(--danger); border:1px solid var(--danger); }
+  .btn-danger:hover { background:var(--danger-light); }
+  .btn-ghost { background:transparent; color:var(--primary); border:1px solid var(--primary); }
+  .btn-ghost:hover { background:var(--primary-light); }
+  .btn-sm { padding:5px 12px; font-size:12px; }
+  .btn-group { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .btn-lg { font-size:16px; padding:14px 48px; border-radius:var(--radius); font-weight:600; }
+
+  /* ===== 徽章 ===== */
+  .badge {
+    display:inline-flex; align-items:center; gap:5px; padding:3px 12px;
+    border-radius:20px; font-size:13px; font-weight:600;
+  }
+  .badge-bronze { background:linear-gradient(135deg,#fdf0e2,#fae0c0); color:#9a5b1a; border:1px solid #f0c78a; }
+  .badge-silver { background:linear-gradient(135deg,#f5f5f5,#e8e8e8); color:#4a4a4a; border:1px solid #d0d0d0; }
+  .badge-gold { background:linear-gradient(135deg,#fef9e7,#fef3c7); color:#92400e; border:1px solid #f6d365; }
+
+  /* ===== 统计卡片 ===== */
+  .stat-box {
+    text-align:center; padding:20px 16px; border-radius:var(--radius);
+    border:1px solid var(--border-light); background:#fafbfc;
+    transition:all .2s;
+  }
+  .stat-box:hover { border-color:var(--primary); background:var(--primary-bg); }
+  .stat-box .val { font-size:26px; font-weight:700; color:var(--primary); }
+  .stat-box .label { font-size:12px; color:var(--text3); margin-top:4px; }
+
+  /* ===== 进度条 ===== */
+  .progress-bar { background:#f0f2f5; border-radius:10px; height:24px; overflow:hidden; position:relative; }
+  .progress-fill {
+    height:100%; border-radius:10px; transition:width .6s ease;
+    display:flex; align-items:center; justify-content:flex-end; padding-right:10px;
+    font-size:11px; color:#fff; font-weight:600; min-width:44px;
+  }
+
+  /* ===== 推荐标签 ===== */
+  .recommend-tag {
+    display:inline-block; background:var(--success); color:#fff;
+    font-size:10px; padding:1px 8px; border-radius:8px; margin-left:4px; font-weight:600;
+  }
+
+  /* ===== 提示 ===== */
+  .tip {
+    background:var(--primary-bg); border:1px solid #d4e5ff; border-radius:var(--radius-sm);
+    padding:12px 16px; font-size:13px; color:#1d2129; margin-bottom:16px;
+    line-height:1.7;
+  }
+  .tip::before { content:"💡 "; }
+
+  /* ===== 动画 ===== */
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  .fade-in { animation:fadeIn .25s ease; }
+
+  /* ===== 对比表格 ===== */
+  .compare-table td.recommended { background:#f0f9eb; position:relative; }
+  .compare-table td.recommended::after {
+    content:"✓ 推荐"; position:absolute; top:4px; right:6px;
+    font-size:10px; color:var(--success); font-weight:600;
+  }
+
+  .help-text { font-size:12px; color:var(--text3); margin-top:5px; }
+
+  /* ===== 场景推荐 ===== */
+  .scenario-section { border-left: 4px solid var(--primary); }
+  .scenario-input {
+    width:100%; min-height:76px; padding:14px; border:1px solid var(--border);
+    border-radius:var(--radius-sm); font-size:14px; line-height:1.6; resize:vertical;
+    outline:none; transition:all .2s; font-family:inherit;
+  }
+  .scenario-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(22,93,255,.1); }
+  .scenario-input::placeholder { color:var(--text3); }
+  .preset-tags { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .preset-tag {
+    padding:5px 14px; border-radius:20px; font-size:12px; cursor:pointer;
+    border:1px solid var(--border); background:#fff; color:var(--text2);
+    transition:all .15s; white-space:nowrap; font-weight:500;
+  }
+  .preset-tag:hover { border-color:var(--primary); color:var(--primary); background:var(--primary-light); transform:translateY(-1px); }
+  .preset-tag.selected { border-color:var(--primary); color:var(--primary); background:var(--primary-light); }
+  .recommend-result {
+    display:none; margin-top:20px; padding:20px; border-radius:var(--radius);
+    background:linear-gradient(135deg, #e8f3ff 0%, #f0f7ff 100%);
+    border:1px solid #c9e0ff;
+  }
+  .recommend-result.show { display:block; animation:fadeIn .3s ease; }
+  .recommend-dim { font-size:20px; font-weight:700; display:inline-flex; align-items:center; gap:8px; color:var(--primary); }
+  .recommend-reason { margin-top:10px; font-size:13px; color:var(--text2); line-height:1.8; }
+  .recommend-reason li { margin-bottom:4px; }
+  .confidence { display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--text3); margin-top:8px; }
+  .confidence-bar { width:64px; height:6px; background:#e4e7ed; border-radius:3px; overflow:hidden; }
+  .confidence-fill { height:100%; border-radius:3px; transition:width .4s ease; }
+  .dim-options { display:flex; gap:12px; margin-top:14px; }
+  .dim-option {
+    padding:12px 28px; border-radius:var(--radius-sm); font-size:14px; cursor:pointer;
+    border:2px solid var(--border); background:#fff; transition:all .15s; text-align:center;
+  }
+  .dim-option:hover { border-color:var(--primary); transform:translateY(-1px); box-shadow:0 2px 8px rgba(22,93,255,.12); }
+  .dim-option.active { border-color:var(--primary); background:var(--primary-light); color:var(--primary); font-weight:600; }
+  .dim-option .dim-icon { font-size:24px; display:block; margin-bottom:4px; }
+  .dim-option .dim-text { font-size:13px; }
+  .dim-option .rec-badge {
+    display:inline-block; font-size:10px; background:var(--success); color:#fff;
+    padding:1px 7px; border-radius:8px; margin-left:2px; vertical-align:middle; font-weight:600;
+  }
+  .scenario-set-hint {
+    display:inline-flex; align-items:center; gap:4px; padding:3px 10px;
+    background:var(--primary-light); color:var(--primary); border-radius:12px;
+    font-size:11px; margin-left:8px; font-weight:500;
+  }
+
+  /* ===== 结果区 ===== */
+  .result-card {
+    background: linear-gradient(135deg, #165dff 0%, #722ed1 100%);
+    color: #fff; border-radius: var(--radius); padding: 24px; margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(22,93,255,.2);
+  }
+  .result-card h3 { font-size:15px; opacity:.9; margin-bottom:10px; }
+  .result-card .badge-card {
+    background:rgba(255,255,255,.15); border-radius:var(--radius-sm);
+    padding:14px 18px; min-width:130px; backdrop-filter:blur(4px);
+    border:1px solid rgba(255,255,255,.2);
+  }
+  .result-card .badge-card .badge-label { font-size:12px; opacity:.85; }
+  .result-card .badge-card .badge-threshold { font-size:24px; font-weight:700; margin:4px 0; }
+  .result-card .badge-card .badge-pct { font-size:12px; opacity:.85; }
+
+  /* ===== 参数表单 ===== */
+  .form-field { margin-bottom:20px; }
+  .form-field label {
+    font-size:14px; font-weight:600; display:block; margin-bottom:8px; color:var(--text);
+  }
+  .form-field label .required { color:var(--danger); }
+  .form-row { display:flex; gap:8px; align-items:center; }
+  .form-row .unit { font-size:13px; color:var(--text3); white-space:nowrap; }
+
+  /* ===== 方案说明卡 ===== */
+  .scheme-desc {
+    margin-top:16px; padding:14px 16px; background:#fafbfc; border-radius:var(--radius-sm);
+    border-left:3px solid var(--border);
+  }
+  .scheme-desc.rec { border-left-color:var(--primary); background:var(--primary-bg); }
+
+  /* ===== 快速摘要 ===== */
+  .quick-summary {
+    background:#fafbfc; border-radius:var(--radius-sm); padding:14px 16px; margin-top:12px;
+    border:1px solid var(--border-light);
+  }
+  .quick-summary-title { font-size:13px; color:var(--text2); margin-bottom:6px; font-weight:600; }
+  .quick-summary-content { font-size:13px; color:var(--text3); }
+  .quick-summary-content strong { color:var(--primary); font-weight:600; }
+
+  /* ===== 结果占位 ===== */
+  .result-placeholder {
+    text-align:center; padding:60px 20px; color:var(--text3);
+  }
+  .result-placeholder .placeholder-icon { font-size:48px; margin-bottom:12px; opacity:.4; }
+  .result-placeholder .placeholder-text { font-size:15px; }
+
+  /* ===== 计算按钮区 ===== */
+  .calc-btn-area { text-align:center; margin:32px 0; }
+
+  /* ===== 数据输入头部 ===== */
+  .data-header {
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;
+  }
+  .data-header-title { font-size:15px; font-weight:600; color:var(--text); }
+  .data-header-right { display:flex; gap:8px; align-items:center; }
+  .data-header-right label { font-size:13px; color:var(--text2); }
+
+  /* ===== 响应式 ===== */
+  @media(max-width:768px) {
+    body { padding:16px 12px; }
+    .section { padding:20px 16px; }
+    .page-header { padding:28px 16px; }
+    .page-header h1 { font-size:22px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 页头 -->
+<div class="page-header">
+  <h1>🏅 勋章指标设定工具</h1>
+  <p class="subtitle">参考过去使用数据，智能计算各层级达标比例并推荐最优设定方案</p>
+</div>
+
+<!-- 第零部分：场景智能推荐 -->
+<div class="section scenario-section">
+  <div class="section-title"><span class="icon">🔍</span> 功能使用场景</div>
+  <div class="tip">描述你的功能使用场景，系统将智能推荐使用「天数」还是「次数」作为勋章衡量维度</div>
+
+  <div style="margin-bottom:14px;">
+    <textarea id="scenarioInput" class="scenario-input" placeholder="例如：采销使用采购审批功能完成审批、每日登录系统查看经营数据、使用商品搜索功能查找供应商..."></textarea>
+  </div>
+
+  <div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:8px;">常见场景（点击快速选择）：</div>
+    <div class="preset-tags">
+      <span class="preset-tag" onclick="selectPreset(this,'使用采购审批功能完成审批流程')">📝 采购审批</span>
+      <span class="preset-tag" onclick="selectPreset(this,'每日登录系统')">🔑 每日登录</span>
+      <span class="preset-tag" onclick="selectPreset(this,'提交采购单')">📋 提交采购单</span>
+      <span class="preset-tag" onclick="selectPreset(this,'连续使用数据看板查看经营数据')">📊 查看看板</span>
+      <span class="preset-tag" onclick="selectPreset(this,'搜索商品或供应商')">🔍 搜索商品</span>
+      <span class="preset-tag" onclick="selectPreset(this,'发布促销活动')">🎉 发布促销</span>
+      <span class="preset-tag" onclick="selectPreset(this,'每日查看经营日报并跟进异常')">📈 经营日报</span>
+      <span class="preset-tag" onclick="selectPreset(this,'与供应商在线沟通')">💬 供应商沟通</span>
+      <span class="preset-tag" onclick="selectPreset(this,'填写结算单完成结算')">💰 填写结算单</span>
+      <span class="preset-tag" onclick="selectPreset(this,'持续关注价格波动做比价')">📉 比价跟踪</span>
+    </div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-primary" onclick="analyzeScenario()">🔍 分析推荐</button>
+  </div>
+
+  <div id="recommendResult" class="recommend-result"></div>
+</div>
+
+<!-- 第一部分：数据输入 -->
+<div class="section">
+  <div class="section-title"><span class="icon">📊</span> 使用数据输入</div>
+  <div class="tip">请输入过去一段时间的使用数据（各天数/次数对应的用户人数），系统将以此为参考测算各层级达标比例</div>
+
+  <div class="grid-2">
+    <!-- 左侧：数据表格 -->
+    <div>
+      <div class="data-header">
+        <span class="data-header-title">使用数据</span>
+        <div class="data-header-right">
+          <label>维度：</label>
+          <select id="dimension" style="width:80px;" onchange="onDimensionChange()">
+            <option value="days">天数</option>
+            <option value="times">次数</option>
+          </select>
+        </div>
+      </div>
+      <table id="usageTable">
+        <thead>
+          <tr>
+            <th style="width:38%;">使用<span class="dim-label">天数</span></th>
+            <th style="width:32%;">用户人数</th>
+            <th style="width:18%;">占比</th>
+            <th style="width:12%;"></th>
+          </tr>
+        </thead>
+        <tbody id="usageBody"></tbody>
+      </table>
+      <div class="btn-group">
+        <button class="btn btn-primary btn-sm" onclick="addUsageRow()">＋ 添加行</button>
+        <button class="btn btn-ghost btn-sm" onclick="addBatchRows()">批量添加</button>
+        <button class="btn btn-danger btn-sm" onclick="clearUsageData()">清空</button>
+      </div>
+    </div>
+
+    <!-- 右侧：基础参数 -->
+    <div>
+      <div class="form-field">
+        <label>整体用户总数 <span class="required">*</span></label>
+        <input type="number" id="totalUsers" placeholder="例如：10000" min="1" oninput="recalculate()" style="width:100%;max-width:300px;">
+        <div class="help-text">参与该勋章体系的所有目标用户数</div>
+      </div>
+
+      <div class="form-field">
+        <label>参考数据覆盖周期</label>
+        <div class="form-row">
+          <span class="unit">过去</span>
+          <select id="dataPeriod" style="width:120px;" onchange="recalculate()">
+            <option value="0.25">1周</option>
+            <option value="0.5">2周</option>
+            <option value="1" selected>1个月</option>
+            <option value="2">2个月</option>
+            <option value="3">3个月</option>
+          </select>
+        </div>
+        <div class="help-text">你输入的使用数据覆盖的时间范围，系统以此推算月均使用频率</div>
+      </div>
+
+      <div class="form-field">
+        <label>预测上线后</label>
+        <div class="form-row">
+          <span class="unit">上线</span>
+          <input type="number" id="forecastPeriod" placeholder="3" min="1" value="3" style="width:72px;" oninput="recalculate()">
+          <span class="unit">个月后的达标比例</span>
+        </div>
+        <div class="help-text">勋章上线后数据累加计算，预测经过这段时间后各层级的达标比例</div>
+      </div>
+
+      <div class="quick-summary">
+        <div class="quick-summary-title">📊 快速摘要</div>
+        <div id="quickSummary" class="quick-summary-content">请先输入数据...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 第二部分：勋章层级设定 -->
+<div class="section">
+  <div class="section-title"><span class="icon">🏅</span> 勋章层级设定</div>
+
+  <div class="grid-2">
+    <div>
+      <table id="tierTable">
+        <thead>
+          <tr>
+            <th>层级</th>
+            <th>名称</th>
+            <th>最低<span class="dim-label">天数</span></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tierBody"></tbody>
+      </table>
+      <div class="btn-group">
+        <button class="btn btn-primary btn-sm" onclick="addTierRow()">＋ 添加层级</button>
+        <button class="btn btn-warning btn-sm" onclick="loadPreset('standard')">载入铜银金3级</button>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;">🎯 各层级推荐目标比例</div>
+      <div class="tip">勋章数据累加计算，上线后从零开始累计。铜牌覆盖面广激励参与，金牌稀缺激发追求</div>
+      <table>
+        <thead>
+          <tr><th>层级</th><th>推荐达标比例</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="badge badge-bronze">🥉 铜牌</span></td><td>25% ~ 45%</td><td style="text-align:left;font-size:13px;color:var(--text2);">降低门槛，激励首次参与</td></tr>
+          <tr><td><span class="badge badge-silver">🥈 银牌</span></td><td>10% ~ 25%</td><td style="text-align:left;font-size:13px;color:var(--text2);">培养习惯，形成稳定使用</td></tr>
+          <tr><td><span class="badge badge-gold">🥇 金牌</span></td><td>3% ~ 10%</td><td style="text-align:left;font-size:13px;color:var(--text2);">稀缺荣誉，标杆示范</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 计算按钮 -->
+<div class="calc-btn-area">
+  <button class="btn btn-primary btn-lg" onclick="calculate()">🚀 开始计算</button>
+</div>
+
+<!-- 第三部分：计算结果 -->
+<div class="section">
+  <div class="section-title"><span class="icon">📈</span> 计算结果</div>
+  <div id="resultPlaceholder" class="result-placeholder">
+    <div class="placeholder-icon">📊</div>
+    <div class="placeholder-text">请输入数据后点击「开始计算」</div>
+  </div>
+  <div id="resultArea" style="display:none;"></div>
+</div>
+
+<!-- 第四部分：推荐方案 -->
+<div class="section" id="recommendSection" style="display:none;">
+  <div class="section-title"><span class="icon">⭐</span> 智能推荐方案</div>
+  <div id="recommendArea"></div>
+</div>
+
+<script>
+// ==================== 数据模型 ====================
+
+let usageData = [];
+let tiers = [];
+let dimension = 'days';
+
+const BADGE_CLASSES = ['badge-bronze', 'badge-silver', 'badge-gold'];
+const BADGE_COLORS  = ['#c47324', '#8c8c8c', '#f7ba1e'];
+const BADGE_ICONS   = ['🥉', '🥈', '🥇'];
+const DEFAULT_NAMES = ['铜牌', '银牌', '金牌'];
+
+const TARGET_RANGES = [
+  { min: 0.25, max: 0.45, ideal: 0.35 },
+  { min: 0.10, max: 0.25, ideal: 0.17 },
+  { min: 0.03, max: 0.10, ideal: 0.06 },
+];
+
+// ==================== 初始化 ====================
+
+function init() {
+  const defaults = [
+    {value:1, count:''}, {value:2, count:''}, {value:3, count:''},
+    {value:5, count:''}, {value:7, count:''}, {value:10, count:''},
+    {value:15, count:''}, {value:20, count:''}, {value:30, count:''}
+  ];
+  defaults.forEach(d => addUsageRow(d.value, d.count));
+  loadPreset('standard');
+}
+
+// ==================== 使用数据表格 ====================
+
+function addUsageRow(value='', count='') {
+  usageData.push({value, count});
+  renderUsageTable();
+}
+
+function addBatchRows() {
+  const start = parseInt(prompt('起始天数/次数:', '1')) || 1;
+  const end = parseInt(prompt('结束天数/次数:', '30')) || 30;
+  const step = parseInt(prompt('步长:', '1')) || 1;
+  for (let i = start; i <= end; i += step) {
+    if (!usageData.find(d => d.value == i)) {
+      usageData.push({value: i, count: ''});
+    }
+  }
+  usageData.sort((a,b) => a.value - b.value);
+  renderUsageTable();
+}
+
+function removeUsageRow(idx) {
+  usageData.splice(idx, 1);
+  renderUsageTable();
+  recalculate();
+}
+
+function clearUsageData() {
+  usageData = [];
+  renderUsageTable();
+  recalculate();
+}
+
+function renderUsageTable() {
+  const dimLabel = dimension === 'days' ? '天数' : '次数';
+  document.querySelectorAll('.dim-label').forEach(el => el.textContent = dimLabel);
+
+  const tbody = document.getElementById('usageBody');
+  const totalUsers = parseInt(document.getElementById('totalUsers').value) || 0;
+
+  let html = '';
+  usageData.forEach((d, i) => {
+    const pct = (totalUsers > 0 && d.count) ? ((parseInt(d.count) / totalUsers * 100).toFixed(1) + '%') : '-';
+    html += `<tr class="fade-in">
+      <td><input type="number" min="1" value="${d.value}" onchange="updateUsageVal(${i},this.value)" style="width:80px;"></td>
+      <td><input type="number" min="0" value="${d.count}" placeholder="人数" onchange="updateUsageCnt(${i},this.value)" oninput="updateUsageCnt(${i},this.value)" style="width:100px;"></td>
+      <td style="color:var(--text3);font-size:13px;">${pct}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="removeUsageRow(${i})" style="padding:3px 8px;">✕</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+  updateQuickSummary();
+}
+
+function updateUsageVal(idx, val) {
+  usageData[idx].value = parseInt(val) || 0;
+  usageData.sort((a,b) => a.value - b.value);
+  renderUsageTable();
+  recalculate();
+}
+
+function updateUsageCnt(idx, val) {
+  usageData[idx].count = val;
+  const totalUsers = parseInt(document.getElementById('totalUsers').value) || 0;
+  const rows = document.querySelectorAll('#usageBody tr');
+  if (rows[idx]) {
+    const pctCell = rows[idx].cells[2];
+    const cnt = parseInt(val) || 0;
+    pctCell.textContent = totalUsers > 0 ? (cnt / totalUsers * 100).toFixed(1) + '%' : '-';
+  }
+  updateQuickSummary();
+}
+
+function onDimensionChange() {
+  dimension = document.getElementById('dimension').value;
+  document.querySelectorAll('.dim-option').forEach(o => o.classList.remove('active'));
+  const dimOptions = document.querySelectorAll('.dim-option');
+  dimOptions.forEach(o => {
+    if (o.querySelector('.dim-text') && o.querySelector('.dim-text').textContent.trim().startsWith(dimension === 'days' ? '天数' : '次数')) {
+      o.classList.add('active');
+    }
+  });
+  const dimSelect = document.getElementById('dimension');
+  const hint = dimSelect.parentElement.querySelector('.scenario-set-hint');
+  if (hint) hint.style.display = 'none';
+  renderUsageTable();
+  renderTierTable();
+}
+
+function updateQuickSummary() {
+  const total = parseInt(document.getElementById('totalUsers').value) || 0;
+  const reported = usageData.reduce((s, d) => s + (parseInt(d.count) || 0), 0);
+  const el = document.getElementById('quickSummary');
+  if (total === 0) {
+    el.textContent = '请先输入整体用户总数';
+    return;
+  }
+  const coverage = (reported / total * 100).toFixed(1);
+  const nonUsers = total - reported;
+  el.innerHTML = `已录入 <strong>${reported.toLocaleString()}</strong> 人（覆盖 ${coverage}%）· 未使用/未录入 <strong>${nonUsers.toLocaleString()}</strong> 人`;
+}
+
+// ==================== 层级表格 ====================
+
+function addTierRow(name, threshold) {
+  const idx = tiers.length;
+  tiers.push({
+    name: name || DEFAULT_NAMES[idx] || `第${idx+1}级`,
+    threshold: threshold || '',
+    color: BADGE_COLORS[idx] || '#999',
+    badgeClass: BADGE_CLASSES[idx] || 'badge-bronze',
+    icon: BADGE_ICONS[idx] || '🏅'
+  });
+  renderTierTable();
+}
+
+function removeTierRow(idx) {
+  tiers.splice(idx, 1);
+  tiers.forEach((t, i) => {
+    t.color = BADGE_COLORS[i] || '#999';
+    t.badgeClass = BADGE_CLASSES[i] || 'badge-bronze';
+    t.icon = BADGE_ICONS[i] || '🏅';
+  });
+  renderTierTable();
+  recalculate();
+}
+
+function renderTierTable() {
+  const dimLabel = dimension === 'days' ? '天数' : '次数';
+  const thead = document.querySelector('#tierTable thead tr');
+  thead.cells[2].innerHTML = `最低<span class="dim-label">${dimLabel}</span>`;
+
+  const tbody = document.getElementById('tierBody');
+  let html = '';
+  tiers.forEach((t, i) => {
+    html += `<tr class="fade-in">
+      <td><span class="badge ${t.badgeClass}">${t.icon} ${t.name}</span></td>
+      <td><input type="text" value="${t.name}" onchange="tiers[${i}].name=this.value;renderTierTable()" style="width:80px;"></td>
+      <td><input type="number" min="1" value="${t.threshold}" placeholder="≥?" onchange="tiers[${i}].threshold=this.value;recalculate()" style="width:80px;"></td>
+      <td><button class="btn btn-danger btn-sm" onclick="removeTierRow(${i})" style="padding:3px 8px;">✕</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function loadPreset(type) {
+  tiers = [];
+  if (type === 'standard') {
+    [['铜牌',3],['银牌',7],['金牌',15]].forEach(([n,t]) => addTierRow(n,t));
+  }
+  recalculate();
+}
+
+// ==================== 核心计算 ====================
+
+function recalculate() {
+  updateQuickSummary();
+}
+
+function calculate() {
+  const totalUsers = parseInt(document.getElementById('totalUsers').value) || 0;
+  if (totalUsers <= 0) { alert('请输入整体用户总数！'); return; }
+
+  const data = usageData
+    .filter(d => d.value && d.count)
+    .map(d => ({value: parseInt(d.value), count: parseInt(d.count)}))
+    .sort((a,b) => a.value - b.value);
+
+  if (data.length === 0) { alert('请至少输入一条使用数据！'); return; }
+  if (tiers.length === 0) { alert('请设定至少一个勋章层级！'); return; }
+
+  const reported = data.reduce((s,d) => s + d.count, 0);
+  const nonUsers = Math.max(0, totalUsers - reported);
+
+  function buildCumulativeDist(dataArr) {
+    return function(threshold) {
+      return dataArr.filter(d => d.value >= threshold).reduce((s,d) => s + d.count, 0);
+    };
+  }
+  const getCumulative = buildCumulativeDist(data);
+
+  const currentResults = tiers.map(t => {
+    const threshold = parseInt(t.threshold);
+    if (!threshold) return {...t, currentCount: 0, currentPct: 0};
+    const count = getCumulative(threshold);
+    return {...t, threshold, currentCount: count, currentPct: count / totalUsers};
+  });
+
+  // 累加模式：数据从上线起持续累计，不清零
+  // scaleFactor = 预测月数 / 参考数据月数 = 累计倍数
+  const dataPeriodMonths = parseFloat(document.getElementById('dataPeriod').value) || 1;
+  const forecastPeriodVal = parseInt(document.getElementById('forecastPeriod').value) || 3;
+  const forecastTimeLabel = forecastPeriodVal + '个月';
+  const scaleFactor = forecastPeriodVal / dataPeriodMonths;
+
+  function forecastCumulative(threshold) {
+    // 累加模式下：上线N个月后，用户累计使用量 ≈ 参考数据 × N
+    // 所以要达到threshold，在参考数据中只需要达到 threshold / scaleFactor
+    const adjustedThreshold = threshold / scaleFactor;
+    const sortedData = [...data].sort((a,b) => a.value - b.value);
+    let lower = null, upper = null;
+    for (let i = 0; i < sortedData.length; i++) {
+      if (sortedData[i].value <= adjustedThreshold) lower = sortedData[i];
+      if (sortedData[i].value >= adjustedThreshold && !upper) upper = sortedData[i];
+    }
+    if (!lower && !upper) return 0;
+    if (!lower) return getCumulative(upper.value);
+    if (!upper) return getCumulative(lower.value);
+    if (lower.value === upper.value) return getCumulative(lower.value);
+    const lowerCum = getCumulative(upper.value);
+    const upperCum = getCumulative(lower.value);
+    const ratio = (adjustedThreshold - lower.value) / (upper.value - lower.value);
+    return upperCum + (lowerCum - upperCum) * (1 - ratio);
+  }
+
+  const forecastResults = tiers.map(t => {
+    const threshold = parseInt(t.threshold);
+    if (!threshold) return {...t, forecastCount: 0, forecastPct: 0};
+    const count = forecastCumulative(threshold);
+    return {...t, threshold, forecastCount: Math.round(count), forecastPct: count / totalUsers};
+  });
+
+  const results = currentResults.map((cr, i) => ({
+    ...cr,
+    forecastCount: forecastResults[i].forecastCount,
+    forecastPct: forecastResults[i].forecastPct,
+    growthPct: cr.currentPct > 0
+      ? ((forecastResults[i].forecastPct - cr.currentPct) / cr.currentPct * 100)
+      : Infinity
+  }));
+
+  renderResults(results, totalUsers, nonUsers, scaleFactor, forecastTimeLabel);
+  generateRecommendations(data, totalUsers, nonUsers, getCumulative, forecastCumulative, forecastTimeLabel, scaleFactor);
+}
+
+// ==================== 渲染结果 ====================
+
+function renderResults(results, totalUsers, nonUsers, scaleFactor, forecastTimeLabel) {
+  const dimLabel = dimension === 'days' ? '天' : '次';
+  const dimFullLabel = dimension === 'days' ? '天数' : '次数';
+
+  document.getElementById('resultPlaceholder').style.display = 'none';
+  const area = document.getElementById('resultArea');
+  area.style.display = 'block';
+
+  const dataPeriodMonths = parseFloat(document.getElementById('dataPeriod').value) || 1;
+
+  let html = '';
+
+  html += `<div class="grid-3" style="margin-bottom:24px;">`;
+  html += `<div class="stat-box"><div class="val">${totalUsers.toLocaleString()}</div><div class="label">整体用户数</div></div>`;
+  html += `<div class="stat-box"><div class="val">${dataPeriodMonths}个月</div><div class="label">参考数据周期</div></div>`;
+  html += `<div class="stat-box"><div class="val">${scaleFactor.toFixed(1)}x</div><div class="label">上线${forecastTimeLabel}后累计倍数</div></div>`;
+  html += `</div>`;
+
+  html += `<div class="tip">勋章上线后数据累加计算，从零开始累计。「上线首月」= 基于参考数据的达标比例，「上线${forecastTimeLabel}后」= 数据累计后的预测比例</div>`;
+
+  html += `<table style="margin-bottom:24px;">
+    <thead>
+      <tr>
+        <th>勋章层级</th>
+        <th>阈值（${dimFullLabel}）</th>
+        <th>上线首月达标人数</th>
+        <th>上线首月达标比例</th>
+        <th>上线${forecastTimeLabel}后预测</th>
+        <th>达标情况</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  results.forEach((r, i) => {
+    const target = TARGET_RANGES[i] || TARGET_RANGES[TARGET_RANGES.length - 1];
+    const inRange = r.forecastPct >= target.min && r.forecastPct <= target.max;
+    const aboveRange = r.forecastPct > target.max;
+
+    let statusHtml = '';
+    if (inRange) statusHtml = '<span style="color:var(--success);font-weight:600;">✓ 合理</span>';
+    else if (aboveRange) statusHtml = '<span style="color:var(--warning);font-weight:600;">⚠ 偏高</span>';
+    else statusHtml = '<span style="color:var(--danger);font-weight:600;">✕ 偏低</span>';
+
+    const growthStr = r.growthPct === Infinity ? '∞' : (r.growthPct >= 0 ? '+' : '') + r.growthPct.toFixed(1) + '%';
+
+    html += `<tr>
+      <td><span class="badge ${r.badgeClass}">${r.icon} ${r.name}</span></td>
+      <td>≥ ${r.threshold} ${dimLabel}</td>
+      <td>${r.currentCount.toLocaleString()}</td>
+      <td>${(r.currentPct * 100).toFixed(1)}%</td>
+      <td><strong style="color:var(--primary);">${(r.forecastPct * 100).toFixed(1)}%</strong></td>
+      <td>${statusHtml}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+
+  html += `<div style="margin-bottom:20px;">`;
+  html += `<div style="font-size:15px;font-weight:600;margin-bottom:16px;color:var(--text);">📊 上线首月 vs 上线${forecastTimeLabel}后 达标比例对比</div>`;
+
+  results.forEach(r => {
+    const target = TARGET_RANGES[tiers.indexOf(r)] || TARGET_RANGES[TARGET_RANGES.length - 1];
+    html += `<div style="margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span class="badge ${r.badgeClass}" style="font-size:13px;">${r.icon} ${r.name}（≥${r.threshold}${dimLabel}）</span>
+        <span style="font-size:12px;color:var(--text3);">目标：${(target.min*100).toFixed(0)}%~${(target.max*100).toFixed(0)}%</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+        <span style="font-size:12px;color:var(--text3);width:56px;">首月</span>
+        <div class="progress-bar" style="flex:1;">
+          <div class="progress-fill" style="width:${Math.min(r.currentPct*100,100)}%;background:${r.color};">${(r.currentPct*100).toFixed(1)}%</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span style="font-size:12px;color:var(--text3);width:56px;">${forecastTimeLabel}后</span>
+        <div class="progress-bar" style="flex:1;">
+          <div class="progress-fill" style="width:${Math.min(r.forecastPct*100,100)}%;background:linear-gradient(90deg,${r.color},${r.color}bb);">${(r.forecastPct*100).toFixed(1)}%</div>
+        </div>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  area.innerHTML = html;
+}
+
+// ==================== 推荐方案 ====================
+
+function generateRecommendations(data, totalUsers, nonUsers, getCumulative, forecastCumulative, forecastTimeLabel, scaleFactor) {
+  const section = document.getElementById('recommendSection');
+  section.style.display = 'block';
+  const area = document.getElementById('recommendArea');
+
+  const dimLabel = dimension === 'days' ? '天' : '次';
+
+  const sortedData = [...data].sort((a,b) => a.value - b.value);
+  const allValues = sortedData.map(d => d.value);
+
+  function findBestThreshold(targetPct, minVal, maxVal) {
+    let bestThreshold = minVal, bestDiff = Infinity;
+    const searchMin = Math.max(1, minVal);
+    const searchMax = maxVal || Math.max(...allValues) * 2;
+    for (let t = searchMin; t <= searchMax; t++) {
+      const forecastPct = forecastCumulative(t) / totalUsers;
+      const diff = Math.abs(forecastPct - targetPct);
+      if (diff < bestDiff) { bestDiff = diff; bestThreshold = t; }
+    }
+    const rounded = Math.round(bestThreshold / 5) * 5 || bestThreshold;
+    const roundedPct = forecastCumulative(rounded) / totalUsers;
+    const originalPct = forecastCumulative(bestThreshold) / totalUsers;
+    if (Math.abs(roundedPct - targetPct) < 0.02 && rounded >= searchMin) {
+      return { threshold: rounded, forecastPct: roundedPct, currentPct: getCumulative(rounded) / totalUsers };
+    }
+    return { threshold: bestThreshold, forecastPct: originalPct, currentPct: getCumulative(bestThreshold) / totalUsers };
+  }
+
+  const schemes = [
+    { name: '🎯 均衡方案', desc: '各层级比例接近理想值，覆盖面与稀缺性兼顾', targets: TARGET_RANGES.map(t => t.ideal), recommended: true },
+    { name: '🌱 宽松方案', desc: '降低门槛，让更多人获得勋章，适合功能推广初期', targets: TARGET_RANGES.map(t => t.max), recommended: false },
+    { name: '🏆 严格方案', desc: '提高门槛，勋章更有含金量，适合成熟期功能', targets: TARGET_RANGES.map(t => t.min), recommended: false }
+  ];
+
+  const numTiers = Math.min(tiers.length, 3);
+
+  schemes.forEach(scheme => {
+    let prevMax = 0;
+    scheme.results = [];
+    for (let i = 0; i < numTiers; i++) {
+      const targetPct = scheme.targets[i];
+      const result = findBestThreshold(targetPct, prevMax + 1, null);
+      if (scheme.results.length > 0 && result.threshold <= scheme.results[scheme.results.length - 1].threshold) {
+        result.threshold = scheme.results[scheme.results.length - 1].threshold + 1;
+        result.forecastPct = forecastCumulative(result.threshold) / totalUsers;
+        result.currentPct = getCumulative(result.threshold) / totalUsers;
+      }
+      prevMax = result.threshold;
+      scheme.results.push({ ...result, name: DEFAULT_NAMES[i], badgeClass: BADGE_CLASSES[i], icon: BADGE_ICONS[i], color: BADGE_COLORS[i] });
+    }
+  });
+
+  let html = '';
+
+  const rec = schemes.find(s => s.recommended);
+  html += `<div class="result-card">
+    <h3>⭐ 最优推荐方案：${rec.name} <span class="recommend-tag">推荐</span></h3>
+    <p style="font-size:13px;opacity:.85;margin-bottom:16px;">${rec.desc}</p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">`;
+
+  rec.results.forEach(r => {
+    html += `<div class="badge-card">
+      <div class="badge-label">${r.icon} ${r.name}</div>
+      <div class="badge-threshold">≥${r.threshold}${dimLabel}</div>
+      <div class="badge-pct">上线${forecastTimeLabel}后 ${(r.forecastPct*100).toFixed(1)}% 达标</div>
+    </div>`;
+  });
+
+  html += `</div>
+    <div class="btn-group" style="margin-top:16px;">
+      <button class="btn" style="background:#fff;color:var(--primary);font-weight:600;border-radius:var(--radius-sm);" onclick="applyRecommendation()">✓ 一键应用此方案</button>
+    </div>
+  </div>`;
+
+  html += `<div style="font-size:15px;font-weight:600;margin-bottom:14px;color:var(--text);">📋 三种方案对比</div>`;
+  html += `<table class="compare-table">
+    <thead><tr><th>层级</th>`;
+
+  schemes.forEach(s => {
+    html += `<th>${s.name}${s.recommended ? ' <span class="recommend-tag">推荐</span>' : ''}</th>`;
+  });
+
+  html += `</tr></thead><tbody>`;
+
+  for (let i = 0; i < numTiers; i++) {
+    html += `<tr>
+      <td><span class="badge ${BADGE_CLASSES[i]}">${BADGE_ICONS[i]} ${DEFAULT_NAMES[i]}</span></td>`;
+    schemes.forEach(s => {
+      const r = s.results[i];
+      const target = TARGET_RANGES[i] || TARGET_RANGES[TARGET_RANGES.length-1];
+      const inRange = r.forecastPct >= target.min && r.forecastPct <= target.max;
+      html += `<td class="${s.recommended ? 'recommended' : ''}" style="position:relative;">
+        <div style="font-weight:600;font-size:15px;">≥ ${r.threshold} ${dimLabel}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px;">首月 ${(r.currentPct*100).toFixed(1)}% → 上线${forecastTimeLabel}后 ${(r.forecastPct*100).toFixed(1)}%</div>
+        <div style="font-size:11px;margin-top:2px;color:${inRange ? 'var(--success)' : 'var(--warning)'};font-weight:500;">${inRange ? '✓ 合理' : '⚠ 偏差'}</div>
+      </td>`;
+    });
+    html += `</tr>`;
+  }
+  html += `</tbody></table>`;
+
+  schemes.forEach(s => {
+    html += `<div class="scheme-desc ${s.recommended ? 'rec' : ''}">
+      <div style="font-size:14px;font-weight:600;">${s.name}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px;">${s.desc}</div>
+      <div style="font-size:13px;margin-top:6px;color:var(--text2);">${s.results.map(r => `${r.icon}${r.name} ≥${r.threshold}${dimLabel}(${(r.forecastPct*100).toFixed(1)}%)`).join(' &nbsp;→&nbsp; ')}</div>
+    </div>`;
+  });
+
+  window._recommendedScheme = rec;
+  area.innerHTML = html;
+}
+
+function applyRecommendation() {
+  if (!window._recommendedScheme) return;
+  const rec = window._recommendedScheme;
+  tiers = [];
+  rec.results.forEach((r, i) => {
+    tiers.push({ name: r.name, threshold: r.threshold, color: r.color, badgeClass: r.badgeClass, icon: r.icon });
+  });
+  renderTierTable();
+  calculate();
+  document.getElementById('resultArea').scrollIntoView({behavior:'smooth'});
+}
+
+// ==================== 场景智能推荐 ====================
+
+const SCENARIO_RULES = {
+  days: {
+    label: '天数', icon: '📅',
+    keywords: ['登录','签到','打卡','连续','每天','每日','日常','定期','习惯',
+               '活跃','出勤','在线','坚持','巡视','巡店','盯盘','跟进',
+               '看板','日报','周报','查看','浏览','关注','监控','追踪','持续'],
+    reasons: [
+      '该场景侧重「持续性参与」，用天数衡量更能体现用户的习惯养成和粘性',
+      '按天计量可以鼓励用户持续回归，避免单日集中刷量后流失'
+    ],
+    example: '如：使用该功能 ≥3天 获铜牌勋章，≥7天 获银牌勋章',
+    bestFor: '需要培养用户日常使用习惯、提升DAU/MAU的场景'
+  },
+  times: {
+    label: '次数', icon: '🔢',
+    keywords: ['提交','创建','发布','操作','下单','采购','销售','审批','处理',
+               '完成','发货','结算','录入','填写','生成','搜索','查询',
+               '分享','转发','评论','沟通','发起','申请','报销','活动',
+               '促销','商品','供应商','比价'],
+    reasons: [
+      '该场景侧重「行为产出量」，用次数衡量更能反映用户实际贡献度和参与深度',
+      '按次计量直接挂钩业务产出，勋章含金量更直观'
+    ],
+    example: '如：使用该功能 ≥5次 获铜牌勋章，≥15次 获银牌勋章',
+    bestFor: '需要衡量业务产出、推动用户完成关键操作的场景'
+  }
+};
+
+const PRESET_SCENARIOS = {
+  '使用采购审批功能完成审批流程': 'times',
+  '每日登录系统': 'days',
+  '提交采购单': 'times',
+  '连续使用数据看板查看经营数据': 'days',
+  '搜索商品或供应商': 'times',
+  '发布促销活动': 'times',
+  '每日查看经营日报并跟进异常': 'days',
+  '与供应商在线沟通': 'times',
+  '填写结算单完成结算': 'times',
+  '持续关注价格波动做比价': 'days'
+};
+
+function selectPreset(el, text) {
+  document.getElementById('scenarioInput').value = text;
+  document.querySelectorAll('.preset-tag').forEach(t => t.classList.remove('selected'));
+  el.classList.add('selected');
+  analyzeScenario();
+}
+
+function analyzeScenario() {
+  const text = document.getElementById('scenarioInput').value.trim();
+  if (!text) { alert('请先输入或选择一个功能使用场景'); return; }
+
+  let scores = { days: 0, times: 0 };
+  let matchedKw = { days: [], times: [] };
+
+  if (PRESET_SCENARIOS[text]) scores[PRESET_SCENARIOS[text]] += 10;
+
+  for (const [dim, rule] of Object.entries(SCENARIO_RULES)) {
+    rule.keywords.forEach(kw => {
+      if (text.includes(kw)) { scores[dim] += 1; matchedKw[dim].push(kw); }
+    });
+  }
+
+  matchedKw.days = [...new Set(matchedKw.days)];
+  matchedKw.times = [...new Set(matchedKw.times)];
+
+  const total = scores.days + scores.times;
+  let recommended, confidence;
+
+  if (total === 0) {
+    if (text.includes('日') || text.includes('天') || text.includes('每')) { recommended = 'days'; confidence = 0.5; }
+    else { recommended = 'times'; confidence = 0.35; }
+  } else {
+    recommended = scores.days > scores.times ? 'days' : 'times';
+    const maxScore = Math.max(scores.days, scores.times);
+    confidence = Math.min(0.95, 0.5 + (maxScore / total) * 0.4);
+  }
+
+  const rule = SCENARIO_RULES[recommended];
+  const otherDim = recommended === 'days' ? 'times' : 'days';
+  const otherRule = SCENARIO_RULES[otherDim];
+  const otherScore = scores[otherDim];
+  const confPct = Math.round(confidence * 100);
+  const confColor = confidence >= 0.7 ? 'var(--success)' : confidence >= 0.5 ? 'var(--warning)' : 'var(--text3)';
+  const confText = confidence >= 0.7 ? '高' : confidence >= 0.5 ? '中' : '低';
+
+  const html = `
+    <div>
+      <div class="recommend-dim">${rule.icon} 推荐使用「${rule.label}」</div>
+      <div class="confidence">
+        置信度：
+        <div class="confidence-bar"><div class="confidence-fill" style="width:${confPct}%;background:${confColor};"></div></div>
+        <span style="color:${confColor};font-weight:600;">${confText}（${confPct}%）</span>
+      </div>
+    </div>
+
+    <div class="recommend-reason" style="margin-top:12px;">
+      <strong>推荐理由：</strong>
+      <ul style="margin-top:6px;padding-left:20px;">
+        ${rule.reasons.map(r => `<li>${r}</li>`).join('')}
+      </ul>
+      ${matchedKw[recommended].length > 0 ? `<div style="margin-top:8px;color:var(--text3);font-size:12px;">匹配关键词：${matchedKw[recommended].map(k => `<span style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:4px;margin-right:4px;font-weight:500;">${k}</span>`).join('')}</div>` : ''}
+    </div>
+
+    <div style="margin-top:12px;padding:12px 14px;background:rgba(255,255,255,.8);border-radius:var(--radius-sm);font-size:12px;color:var(--text2);border:1px solid rgba(255,255,255,.5);">
+      <div>📌 ${rule.example}</div>
+      <div style="margin-top:4px;">💡 最适合：${rule.bestFor}</div>
+      ${otherScore > 0 ? `<div style="margin-top:4px;color:var(--text3);">⚠ 也匹配到「${otherRule.label}」关键词（${matchedKw[otherDim].join('、')}），但「${rule.label}」匹配度更高</div>` : ''}
+    </div>
+
+    <div style="margin-top:16px;font-size:13px;color:var(--text2);font-weight:500;">请确认要使用的维度：</div>
+    <div class="dim-options">
+      <div class="dim-option ${recommended === 'days' ? 'active' : ''}" onclick="confirmDimension('days', this)">
+        <span class="dim-icon">📅</span>
+        <span class="dim-text">天数${recommended === 'days' ? ' <span class="rec-badge">推荐</span>' : ''}</span>
+      </div>
+      <div class="dim-option ${recommended === 'times' ? 'active' : ''}" onclick="confirmDimension('times', this)">
+        <span class="dim-icon">🔢</span>
+        <span class="dim-text">次数${recommended === 'times' ? ' <span class="rec-badge">推荐</span>' : ''}</span>
+      </div>
+    </div>
+  `;
+
+  const resultEl = document.getElementById('recommendResult');
+  resultEl.innerHTML = html;
+  resultEl.classList.add('show');
+}
+
+function confirmDimension(dim, el) {
+  dimension = dim;
+  document.getElementById('dimension').value = dim;
+  document.querySelectorAll('.dim-option').forEach(o => o.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  const dimSelect = document.getElementById('dimension');
+  let hint = dimSelect.parentElement.querySelector('.scenario-set-hint');
+  if (!hint) {
+    hint = document.createElement('span');
+    hint.className = 'scenario-set-hint';
+    dimSelect.parentElement.appendChild(hint);
+  }
+  hint.textContent = '✓ 已根据场景设定';
+  hint.style.display = 'inline-flex';
+
+  renderUsageTable();
+  renderTierTable();
+  document.getElementById('usageTable').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ==================== 启动 ====================
+init();
+</script>
+
+</body>
+</html>
