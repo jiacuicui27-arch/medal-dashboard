@@ -754,9 +754,6 @@ function calculate() {
     ...cr,
     forecastCount: forecastResults[i].forecastCount,
     forecastPct: forecastResults[i].forecastPct,
-    growthPct: cr.currentPct > 0
-      ? ((forecastResults[i].forecastPct - cr.currentPct) / cr.currentPct * 100)
-      : Infinity
   }));
 
   renderResults(results, totalUsers, nonUsers, scaleFactor, forecastTimeLabel);
@@ -807,8 +804,6 @@ function renderResults(results, totalUsers, nonUsers, scaleFactor, forecastTimeL
     if (inRange) statusHtml = '<span style="color:var(--success);font-weight:600;">✓ 合理</span>';
     else if (aboveRange) statusHtml = '<span style="color:var(--warning);font-weight:600;">⚠ 偏高</span>';
     else statusHtml = '<span style="color:var(--danger);font-weight:600;">✕ 偏低</span>';
-
-    const growthStr = r.growthPct === Infinity ? '∞' : (r.growthPct >= 0 ? '+' : '') + r.growthPct.toFixed(1) + '%';
 
     html += `<tr>
       <td><span class="badge ${r.badgeClass}">${r.icon} ${r.name}</span></td>
