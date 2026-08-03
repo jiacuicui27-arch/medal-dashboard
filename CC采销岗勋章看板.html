@@ -1511,7 +1511,7 @@ function calculate() {
     return upperCum+(lowerCum-upperCum)*(1-ratio);
   }
   const forecastResults=tiers.map(t=>{const threshold=parseInt(t.threshold);if(!threshold)return{...t,forecastCount:0,forecastPct:0};const count=forecastCumulative(threshold);return{...t,threshold,forecastCount:Math.round(count),forecastPct:count/totalUsers};});
-  const results=currentResults.map((cr,i)=>({...cr,forecastCount:forecastResults[i].forecastCount,forecastPct:forecastResults[i].forecastPct,growthPct:cr.currentPct>0?((forecastResults[i].forecastPct-cr.currentPct)/cr.currentPct*100):Infinity}));
+  const results=currentResults.map((cr,i)=>({...cr,forecastCount:forecastResults[i].forecastCount,forecastPct:forecastResults[i].forecastPct}));
   renderResults(results,totalUsers,nonUsers,scaleFactor,forecastTimeLabel);
   generateRecommendations(data,totalUsers,nonUsers,getCumulative,forecastCumulative,forecastTimeLabel,scaleFactor);
 }
@@ -1528,12 +1528,11 @@ function renderResults(results,totalUsers,nonUsers,scaleFactor,forecastTimeLabel
   html+='<div class="tool-stat-box"><div class="val">'+scaleFactor.toFixed(1)+'x</div><div class="label">上线'+forecastTimeLabel+'后累计倍数</div></div>';
   html+='</div>';
   html+='<div class="tool-tip">勋章上线后数据累加计算，从零开始累计。「上线首月」= 基于参考数据的达标比例，「上线'+forecastTimeLabel+'后」= 数据累计后的预测比例</div>';
-  html+='<table class="tool-table" style="margin-bottom:24px;"><thead><tr><th>勋章层级</th><th>阈值（'+dimFullLabel+'）</th><th>上线首月达标人数</th><th>上线首月达标比例</th><th>上线'+forecastTimeLabel+'后预测</th><th>达标提升</th><th>达标情况</th></tr></thead><tbody>';
+  html+='<table class="tool-table" style="margin-bottom:24px;"><thead><tr><th>勋章层级</th><th>阈值（'+dimFullLabel+'）</th><th>上线首月达标人数</th><th>上线首月达标比例</th><th>上线'+forecastTimeLabel+'后预测</th><th>达标情况</th></tr></thead><tbody>';
   results.forEach((r,i)=>{
     const target=TARGET_RANGES[i]||TARGET_RANGES[TARGET_RANGES.length-1];const inRange=r.forecastPct>=target.min&&r.forecastPct<=target.max;const aboveRange=r.forecastPct>target.max;
     let statusHtml='';if(inRange)statusHtml='<span style="color:#66bb6a;font-weight:600;">✓ 合理</span>';else if(aboveRange)statusHtml='<span style="color:#ff7043;font-weight:600;">⚠ 偏高</span>';else statusHtml='<span style="color:#ef5350;font-weight:600;">✕ 偏低</span>';
-    const growthStr=r.growthPct===Infinity?'∞':(r.growthPct>=0?'+':'')+r.growthPct.toFixed(1)+'%';
-    html+='<tr><td><span class="tool-badge '+r.badgeClass+'">'+r.icon+' '+r.name+'</span></td><td>≥ '+r.threshold+' '+dimLabel+'</td><td>'+r.currentCount.toLocaleString()+'</td><td>'+(r.currentPct*100).toFixed(1)+'%</td><td><strong style="color:#ffa726;">'+(r.forecastPct*100).toFixed(1)+'%</strong></td><td style="color:'+(r.growthPct>=0?'#66bb6a':'#ef5350')+';font-weight:500;">'+growthStr+'</td><td>'+statusHtml+'</td></tr>';
+    html+='<tr><td><span class="tool-badge '+r.badgeClass+'">'+r.icon+' '+r.name+'</span></td><td>≥ '+r.threshold+' '+dimLabel+'</td><td>'+r.currentCount.toLocaleString()+'</td><td>'+(r.currentPct*100).toFixed(1)+'%</td><td><strong style="color:#ffa726;">'+(r.forecastPct*100).toFixed(1)+'%</strong></td><td>'+statusHtml+'</td></tr>';
   });
   html+='</tbody></table>';
   html+='<div style="margin-bottom:20px;"><div style="font-size:15px;font-weight:600;margin-bottom:16px;color:#e0e6ed;">📊 上线首月 vs 上线'+forecastTimeLabel+'后 达标比例对比</div>';
