@@ -872,6 +872,28 @@
     </div>
   </div>
 
+  <!-- Charts Row 2 -->
+  <div class="section">
+    <div class="section-title">🎯 勋章等级分布</div>
+    <div style="margin-bottom:14px;padding:14px;background:rgba(255,167,38,0.06);border-radius:10px;font-size:13px;color:#b0d4f1;line-height:2">
+      <strong style="color:#ffa726">📌 等级含义说明：</strong>按发放率划分获取难度等级——<br>
+      <span style="color:#5a7a95;font-weight:700">无人获得</span> = 发放率0% → <span style="color:#7a9bb5">尚无采销岗员工获得</span><br>
+      <span style="color:#ef5350;font-weight:700">困难</span> = 发放率0%-10% → <span style="color:#7a9bb5">极少数人能获得</span><br>
+      <span style="color:#ff7043;font-weight:700">较难</span> = 发放率10%-30% → <span style="color:#7a9bb5">需要一定努力才能获得</span><br>
+      <span style="color:#ffa726;font-weight:700">适中</span> = 发放率30%-60% → <span style="color:#7a9bb5">大部分活跃用户可获得</span><br>
+      <span style="color:#66bb6a;font-weight:700">简单</span> = 发放率≥60% → <span style="color:#7a9bb5">人人可得，含金量低</span>
+    </div>
+    <div class="chart-container" style="max-width:420px;margin:0 auto"><canvas id="chartTierPie"></canvas></div>
+  </div>
+
+  <!-- Difficulty Distribution — 只保留柱形图，去掉曲线图 -->
+  <div class="section">
+    <div class="section-title rose">🎯 勋章难易程度分布 — 发放率区间分析</div>
+    <div id="diffHighlight" style="margin-bottom:16px"></div>
+    <div class="chart-container" style="height:400px"><canvas id="chartDiffDist"></canvas></div>
+    <div id="diffInsights" style="margin-top:16px"></div>
+  </div>
+
   <!-- Medal Popularity Table -->
   <div class="section">
     <div class="section-title">🏅 勋章发放排行 — 采销岗各勋章获得人数</div>
@@ -893,47 +915,6 @@
         </thead>
         <tbody id="medalTable"></tbody>
       </table>
-    </div>
-  </div>
-
-  <!-- Charts Row 2 -->
-  <div class="section">
-    <div class="section-title">🎯 勋章等级分布</div>
-    <div style="margin-bottom:14px;padding:14px;background:rgba(255,167,38,0.06);border-radius:10px;font-size:13px;color:#b0d4f1;line-height:2">
-      <strong style="color:#ffa726">📌 等级含义说明：</strong>按发放率划分获取难度等级——<br>
-      <span style="color:#5a7a95;font-weight:700">无人获得</span> = 发放率0% → <span style="color:#7a9bb5">尚无采销岗员工获得</span><br>
-      <span style="color:#ef5350;font-weight:700">困难</span> = 发放率0%-10% → <span style="color:#7a9bb5">极少数人能获得</span><br>
-      <span style="color:#ff7043;font-weight:700">较难</span> = 发放率10%-30% → <span style="color:#7a9bb5">需要一定努力才能获得</span><br>
-      <span style="color:#ffa726;font-weight:700">适中</span> = 发放率30%-60% → <span style="color:#7a9bb5">大部分活跃用户可获得</span><br>
-      <span style="color:#66bb6a;font-weight:700">简单</span> = 发放率≥60% → <span style="color:#7a9bb5">人人可得，含金量低</span>
-    </div>
-    <div class="chart-container" style="max-width:420px;margin:0 auto"><canvas id="chartTierPie"></canvas></div>
-  </div>
-
-  <!-- Difficulty Distribution — 只保留柱形图，去掉曲线图 -->
-  <div class="section">
-    <div class="section-title rose">🎯 勋章难易程度分布 — 发放率区间分析</div>
-    <div id="diffHighlight" style="margin-bottom:16px"></div>
-    <div class="chart-container" style="height:400px"><canvas id="chartDiffDist"></canvas></div>
-    <div id="diffInsights" style="margin-top:16px"></div>
-    <div style="margin-top:16px">
-      <div style="font-size:14px;font-weight:600;color:#8aabb5;margin-bottom:10px;padding-left:8px;border-left:3px solid #f06292">各发放率区间勋章明细</div>
-      <div class="medal-table-wrap" style="max-height:420px">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:40px;text-align:center">#</th>
-              <th>勋章名称</th>
-              <th>目的类型</th>
-              <th>勋章类型</th>
-              <th style="text-align:right">获得人数</th>
-              <th style="text-align:right">发放率</th>
-              <th>难度等级</th>
-            </tr>
-          </thead>
-          <tbody id="diffTable"></tbody>
-        </table>
-      </div>
     </div>
   </div>
 
@@ -1355,17 +1336,6 @@ var diffInsightData = [
   {tag:'核心洞察',tagColor:'#4fc3f7',text:'排除限定后，采销岗的勋章难易呈<b>"两极分化"</b>：<b>'+aggSimple+'枚简单勋章</b>以场景情感/纪念类为主，"登录即得"；<b>'+aggHard+'枚困难勋章</b>以功能牵引类为主，需主动使用工具。从30%到60%的"适中"区间仅<b>'+aggModerate+'枚</b>，说明<b>简单与困难之间缺少平滑过渡</b>，建议增加"中间难度"勋章以丰富进阶体验。'}
 ];
 document.getElementById('diffInsights').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">'+diffInsightData.map(function(c){return '<div style="background:rgba(240,98,146,0.05);border:1px solid rgba(240,98,146,0.12);border-radius:10px;padding:14px 16px"><div style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;margin-bottom:8px;background:rgba(240,98,146,0.12);color:'+c.tagColor+'">'+c.tag+'</div><div style="font-size:13px;color:#b0d4f1;line-height:1.8">'+c.text+'</div></div>';}).join('')+'</div>';
-
-// Difficulty detail table
-var diffTableRows = [];
-var diffCategories = [{label:'限定',medals:DATA.medals.filter(function(m){return isRestricted(m);}),color:'#ab47bc'},{label:'0%',medals:DATA.medals.filter(function(m){return m.count===0&&!isRestricted(m);}),color:'#5a7a95'}];
-diffBands.slice(1).forEach(function(band){var normal=band.normal;if(normal.length>0)diffCategories.push({label:band.label,medals:normal,color:band.color});});
-diffCategories.forEach(function(cat){var sorted=cat.medals.slice().sort(function(a,b){return b.count-a.count;});sorted.forEach(function(m){var rate=m.count/TOTAL_EMP*100;diffTableRows.push({name:m.name,purpose:m.purpose,medalType:m.medal_type,count:m.count,rate:rate,cat:cat});});});
-document.getElementById('diffTable').innerHTML = diffTableRows.map(function(row,idx) {
-  var tier = getTier(row.count); var origMedal = DATA.medals.find(function(m){return m.name===row.name;}); var restrBadge = '';
-  if(origMedal&&isRestricted(origMedal)) restrBadge = ' <span class="type-badge" style="background:rgba(171,71,188,0.15);color:#ab47bc">限定</span>';
-  return '<tr'+(idx>0&&diffTableRows[idx-1].cat.label!==row.cat.label?' style="border-top:2px solid #2a4a6a"':'')+'><td class="rank">'+(idx+1)+'</td><td class="medal-name">'+row.name+restrBadge+'</td><td>'+purposeBadge(row.purpose)+'</td><td>'+typeBadge(row.medalType)+'</td><td class="count">'+fmt(row.count)+'</td><td class="pct" style="color:'+row.cat.color+';font-weight:600">'+row.rate.toFixed(2)+'%</td><td><span class="tier-badge '+tier.cls+'">'+tier.label+'</span></td></tr>';
-}).join('');
 
 // ===== PERCENTILE =====
 var percentiles = [{label:'P10',value:DATA.percentiles.p10},{label:'P25',value:DATA.percentiles.p25},{label:'P50(中位数)',value:DATA.percentiles.p50},{label:'P75',value:DATA.percentiles.p75},{label:'P90',value:DATA.percentiles.p90},{label:'P95',value:DATA.percentiles.p95},{label:'P99',value:DATA.percentiles.p99}];
