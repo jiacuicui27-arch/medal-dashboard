@@ -943,15 +943,6 @@
   </div>
 
   <div class="section">
-    <div class="section-title purple">👥 采销岗岗位细分对比</div>
-    <div class="dept-grid" id="roleCards"></div>
-    <div class="chart-row">
-      <div class="chart-container"><canvas id="chartRoleAvg"></canvas></div>
-      <div class="chart-container"><canvas id="chartRoleSingleRate"></canvas></div>
-    </div>
-  </div>
-
-  <div class="section">
     <div class="section-title green">🏷️ TOP20勋章在采销岗二级部门的分布</div>
     <div class="chart-container"><canvas id="chartMedalDeptStack"></canvas></div>
   </div>
@@ -1352,11 +1343,6 @@ document.getElementById('deptCards').innerHTML = deptData.map(function(d){return
 var deptChartDepts = deptData.slice().sort(function(a,b){return b.avg-a.avg;});
 new Chart(document.getElementById('chartDeptAvg'), { type:'bar', data:{labels:deptChartDepts.map(function(d){return d.name;}),datasets:[{label:'人均勋章数',data:deptChartDepts.map(function(d){return d.avg;}),backgroundColor:deptChartDepts.map(function(d){return d.avg>=13?'rgba(255,167,38,0.7)':d.avg>=10?'rgba(79,195,247,0.7)':d.avg>=5?'rgba(102,187,106,0.7)':'rgba(239,83,80,0.7)';}),borderRadius:4}]}, options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return '人均'+ctx.raw+'枚 · 中位数'+deptChartDepts[ctx.dataIndex].median+'枚';}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'人均勋章数',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:10}}}}} });
 new Chart(document.getElementById('chartDeptSingleRate'), { type:'bar', data:{labels:deptChartDepts.map(function(d){return d.name;}),datasets:[{label:'仅1枚用户占比',data:deptChartDepts.map(function(d){return d.singleRate;}),backgroundColor:deptChartDepts.map(function(d){return d.singleRate>=10?'rgba(239,83,80,0.7)':d.singleRate>=5?'rgba(255,167,38,0.7)':'rgba(102,187,106,0.7)';}),borderRadius:4}]}, options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.raw+'% 仅持1枚（'+fmt(deptChartDepts[ctx.dataIndex].singleCount)+'人）';}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'仅1枚用户占比(%)',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:10}}}}} });
-
-var roleData = DEPT.roleSummary;
-document.getElementById('roleCards').innerHTML = roleData.map(function(r){return '<div class="dept-card role-card"><div class="dept-name">'+r.name+'</div><div class="dept-avg">'+r.avg+'</div><div class="dept-meta">人均勋章 · '+fmt(r.total)+'人 · 仅1枚'+r.singleRate+'%</div></div>';}).join('');
-new Chart(document.getElementById('chartRoleAvg'), { type:'bar', data:{labels:roleData.map(function(r){return r.name;}),datasets:[{label:'人均勋章数',data:roleData.map(function(r){return r.avg;}),backgroundColor:roleData.map(function(r){return r.avg>=12?'rgba(171,71,188,0.7)':r.avg>=8?'rgba(255,167,38,0.7)':'rgba(239,83,80,0.7)';}),borderRadius:4}]}, options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return '人均'+ctx.raw+'枚 · 中位数'+roleData[ctx.dataIndex].median+'枚';}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'人均勋章数',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:11}}}}} });
-new Chart(document.getElementById('chartRoleSingleRate'), { type:'bar', data:{labels:roleData.map(function(r){return r.name;}),datasets:[{label:'仅1枚用户占比',data:roleData.map(function(r){return r.singleRate;}),backgroundColor:roleData.map(function(r){return r.singleRate>=10?'rgba(239,83,80,0.7)':r.singleRate>=5?'rgba(255,167,38,0.7)':'rgba(102,187,106,0.7)';}),borderRadius:4}]}, options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.raw+'% 仅持1枚（'+fmt(roleData[ctx.dataIndex].singleCount)+'人）';}}}},scales:{x:{grid:{color:'#1e3550'},title:{display:true,text:'仅1枚用户占比(%)',color:'#7a9bb5'}},y:{grid:{display:false},ticks:{font:{size:11}}}}} });
 
 var top20Dept = DEPT.medalDeptDist;
 var allDeptsForStack = []; var seen = {};
