@@ -1569,6 +1569,13 @@ function generateRecommendations(data,totalUsers,nonUsers,getCumulative,forecast
   html+='<div class="tool-result-card"><h3>⭐ 最优推荐方案：'+rec.name+' <span class="tool-recommend-tag">推荐</span></h3><p style="font-size:13px;opacity:.85;margin-bottom:16px;color:#0f1923;">'+rec.desc+'</p><div style="display:flex;gap:16px;flex-wrap:wrap;">';
   rec.results.forEach(r=>{html+='<div class="badge-card"><div class="badge-label">'+r.icon+' '+r.name+'</div><div class="badge-threshold">≥'+r.threshold+dimLabel+'</div><div class="badge-pct">上线'+forecastTimeLabel+'后 '+(r.forecastPct*100).toFixed(1)+'% 达标</div></div>';});
   html+='</div><div class="tool-btn-group" style="margin-top:16px;"><button class="tool-btn" style="background:#0f1923;color:#ffa726;font-weight:600;border-radius:8px;" onclick="applyRecommendation()">✓ 一键应用此方案</button></div></div>';
+  html+='<div style="font-size:15px;font-weight:600;margin-bottom:14px;color:#e0e6ed;">📋 三种方案对比</div>';
+  html+='<table class="tool-table tool-compare-table"><thead><tr><th>层级</th>';
+  schemes.forEach(s=>{html+='<th>'+s.name+(s.recommended?' <span class="tool-recommend-tag">推荐</span>':'')+'</th>';});
+  html+='</tr></thead><tbody>';
+  for(let i=0;i<numTiers;i++){html+='<tr><td><span class="tool-badge '+BADGE_CLASSES[i]+'">'+BADGE_ICONS[i]+' '+DEFAULT_NAMES[i]+'</span></td>';schemes.forEach(s=>{const r=s.results[i];html+='<td class="'+(s.recommended?'tool-recommended':'')+'" style="position:relative;"><div style="font-weight:600;font-size:15px;">≥ '+r.threshold+' '+dimLabel+'</div><div style="font-size:12px;color:#5a7a95;margin-top:2px;">首月 '+(r.currentPct*100).toFixed(1)+'% → 上线'+forecastTimeLabel+'后 '+(r.forecastPct*100).toFixed(1)+'%</div></td>';});html+='</tr>';}
+  html+='</tbody></table>';
+  schemes.forEach(s=>{html+='<div class="tool-scheme-desc '+(s.recommended?'rec':'')+'"><div style="font-size:14px;font-weight:600;">'+s.name+'</div><div style="font-size:12px;color:#5a7a95;margin-top:4px;">'+s.desc+'</div><div style="font-size:13px;margin-top:6px;color:#8aabb5;">'+s.results.map(r=>r.icon+r.name+' ≥'+r.threshold+dimLabel+'('+(r.forecastPct*100).toFixed(1)+'%)').join(' &nbsp;→&nbsp; ')+'</div></div>';});
   window._recommendedScheme=rec;area.innerHTML=html;
 }
 
