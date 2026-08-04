@@ -35,13 +35,21 @@ def main():
         print("❌ 看板数据更新失败，中止推送")
         sys.exit(1)
 
+    # 1.5. 同步到 index.html（GitHub Pages 入口）
+    print("\n[1.5] 同步到 index.html...")
+    import shutil
+    src = os.path.join(REPO_DIR, TARGET_FILE)
+    dst = os.path.join(REPO_DIR, 'index.html')
+    shutil.copy2(src, dst)
+    print("  ✅ 已同步")
+
     # 2. 检查是否有变更
     print("\n[2/4] 检查数据变更...")
     result = subprocess.run('git diff --name-only', shell=True, cwd=REPO_DIR, capture_output=True, text=True)
     changed = result.stdout.strip()
 
     # 也检查 untracked 的目标文件
-    result2 = subprocess.run(f'git status --porcelain {TARGET_FILE}', shell=True, cwd=REPO_DIR, capture_output=True, text=True)
+    result2 = subprocess.run(f'git status --porcelain {TARGET_FILE} index.html', shell=True, cwd=REPO_DIR, capture_output=True, text=True)
 
     if not changed and not result2.stdout.strip():
         print("  没有数据变更，无需推送 ✅")
@@ -52,7 +60,7 @@ def main():
     # 3. Git commit
     print("\n[3/4] 提交变更...")
     today = datetime.now().strftime('%Y-%m-%d')
-    run(f'git add {TARGET_FILE}')
+    run(f'git add {TARGET_FILE} index.html')
     run(f'git commit -m "自动更新看板数据 {today}"')
 
     # 4. Git push
