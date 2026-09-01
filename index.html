@@ -904,6 +904,7 @@
           <tr>
             <th style="width:40px;text-align:center">#</th>
             <th>勋章名称</th>
+            <th style="font-size:11px;color:#7a9bb5">Code</th>
             <th>目的类型</th>
             <th>勋章类型</th>
             <th>属性</th>
@@ -1179,7 +1180,7 @@ function renderTable() {
   document.getElementById('medalTable').innerHTML = sorted.map(function(m, i) {
     var tier = getTier(m.count); var barW = m.count / maxCount * 100;
     var rankCls = i < 1 ? 'rank-top1' : i < 2 ? 'rank-top2' : i < 3 ? 'rank-top3' : '';
-    return '<tr><td class="rank '+rankCls+'">'+(i+1)+'</td><td class="medal-name">'+m.name+'</td><td>'+purposeBadge(m.purpose)+'</td><td>'+typeBadge(m.medal_type)+'</td><td>'+attrBadge(m.attribute)+'</td><td class="count">'+fmt(m.count)+'</td><td class="pct" style="color:'+tier.color+';font-weight:600">'+pct(m.count)+'</td><td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:'+barW+'%;background:'+tier.color+'"></div></div></td><td><span class="tier-badge '+tier.cls+'">'+tier.label+'</span></td></tr>';
+    return '<tr><td class="rank '+rankCls+'">'+(i+1)+'</td><td class="medal-name">'+m.name+'</td><td style="font-size:11px;color:#5a7a95;font-family:Consolas,Monaco,monospace">'+m.code+'</td><td>'+purposeBadge(m.purpose)+'</td><td>'+typeBadge(m.medal_type)+'</td><td>'+attrBadge(m.attribute)+'</td><td class="count">'+fmt(m.count)+'</td><td class="pct" style="color:'+tier.color+';font-weight:600">'+pct(m.count)+'</td><td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:'+barW+'%;background:'+tier.color+'"></div></div></td><td><span class="tier-badge '+tier.cls+'">'+tier.label+'</span></td></tr>';
   }).join('');
 }
 var sortOptions = [{field:'count',label:'按人数'},{field:'name',label:'按名称'},{field:'purpose',label:'按目的'},{field:'type',label:'按类型'}];
