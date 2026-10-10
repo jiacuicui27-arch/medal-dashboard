@@ -12,7 +12,7 @@ from datetime import datetime
 
 REPO_DIR = '/mnt/d/CC勋章看板'
 BUILD_SCRIPT = os.path.join(REPO_DIR, 'build_dashboard.py')
-TARGET_FILE = 'CC采销岗勋章看板.html'
+TARGET_FILE = '勋章指标设定及数据分析.html'
 
 def run(cmd, cwd=REPO_DIR):
     """运行命令并实时输出"""
